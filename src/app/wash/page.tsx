@@ -2,11 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
-import { db } from '@/lib/firebase';
 
 type WashMenu =
   | '手洗い洗車'
@@ -99,7 +97,10 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
   };
 }
 
-function normalizeFirestoreRecord(record: FirestoreWashRecord, fallbackId: number): WashRecord {
+function normalizeFirestoreRecord(
+  record: FirestoreWashRecord,
+  fallbackId: number
+): WashRecord {
   return {
     id: typeof record.id === 'number' ? record.id : fallbackId,
     date: record.date ?? '',
@@ -107,6 +108,20 @@ function normalizeFirestoreRecord(record: FirestoreWashRecord, fallbackId: numbe
     memo: record.memo ?? '',
     image: record.image ?? undefined,
     products: record.products ?? '',
+  };
+}
+
+async function getFirebaseModules() {
+  const [{ db }, firestore] = await Promise.all([
+    import('@/lib/firebase'),
+    import('firebase/firestore/lite'),
+  ]);
+
+  return {
+    db,
+    collection: firestore.collection,
+    addDoc: firestore.addDoc,
+    getDocs: firestore.getDocs,
   };
 }
 
@@ -147,23 +162,26 @@ export default function WashPage() {
   useEffect(() => {
     async function loadRecords() {
       try {
+        const { db, collection, getDocs } = await getFirebaseModules();
         const snapshot = await getDocs(collection(db, 'washRecords'));
 
         if (!snapshot.empty) {
           const firestoreDocs = snapshot.docs.map((doc, index) => {
             const data = doc.data() as FirestoreWashRecord;
             return {
-              docId: doc.id,
               data,
               fallbackId: Date.now() + index,
             };
           });
 
-          // create のみを一覧用に採用
-          const createdOnly = firestoreDocs.filter((item) => item.data.mode !== 'edit');
+          const createdOnly = firestoreDocs.filter(
+            (item) => item.data.mode !== 'edit'
+          );
 
           const firestoreRecords = createdOnly
-            .map((item) => normalizeFirestoreRecord(item.data, item.fallbackId))
+            .map((item) =>
+              normalizeFirestoreRecord(item.data, item.fallbackId)
+            )
             .filter((record) => record.date && record.menus.length > 0)
             .sort((a, b) => {
               const aTime = new Date(a.date).getTime();
@@ -172,7 +190,10 @@ export default function WashPage() {
             });
 
           setRecords(firestoreRecords);
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreRecords));
+          window.localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(firestoreRecords)
+          );
           setSavedMessage('Firebaseから洗車記録を読み込みました');
           setIsLoaded(true);
           return;
@@ -208,14 +229,20 @@ export default function WashPage() {
               ? parsed.map(normalizeRecord)
               : DEFAULT_RECORDS;
             setRecords(normalized);
-            setSavedMessage('Firebase読み込み失敗のためlocalStorageを表示しています');
+            setSavedMessage(
+              'Firebase読み込み失敗のためlocalStorageを表示しています'
+            );
           } catch {
             setRecords(DEFAULT_RECORDS);
-            setSavedMessage('Firebase読み込み失敗のため初期データを表示しています');
+            setSavedMessage(
+              'Firebase読み込み失敗のため初期データを表示しています'
+            );
           }
         } else {
           setRecords(DEFAULT_RECORDS);
-          setSavedMessage('Firebase読み込み失敗のため初期データを表示しています');
+          setSavedMessage(
+            'Firebase読み込み失敗のため初期データを表示しています'
+          );
         }
       } finally {
         setIsLoaded(true);
@@ -269,6 +296,8 @@ export default function WashPage() {
     }
 
     try {
+      const { db, collection, addDoc } = await getFirebaseModules();
+
       if (editingId !== null) {
         const updatedRecords = records.map((record) =>
           record.id === editingId
@@ -332,7 +361,9 @@ export default function WashPage() {
       setErrors({});
     } catch (error) {
       console.error('Firestoreへの保存に失敗しました:', error);
-      setSavedMessage('Firebase保存でエラーが出ました。localStorageへの保存状態を確認してください');
+      setSavedMessage(
+        'Firebase保存でエラーが出ました。localStorageへの保存状態を確認してください'
+      );
     }
   }
 
