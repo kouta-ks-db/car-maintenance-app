@@ -18,6 +18,7 @@ type WashMenu =
 
 type WashRecord = {
   id: number;
+  docId?: string;
   date: string;
   menus: WashMenu[];
   memo: string;
@@ -43,8 +44,7 @@ type FirestoreWashRecord = {
   image?: string | null;
   products?: string;
   createdAt?: string;
-  mode?: 'create' | 'edit';
-  originalId?: number;
+  updatedAt?: string;
 };
 
 type WashErrors = {
@@ -98,11 +98,13 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
 }
 
 function normalizeFirestoreRecord(
+  docId: string,
   record: FirestoreWashRecord,
   fallbackId: number
 ): WashRecord {
   return {
     id: typeof record.id === 'number' ? record.id : fallbackId,
+    docId,
     date: record.date ?? '',
     menus: Array.isArray(record.menus) ? record.menus : [],
     memo: record.memo ?? '',
@@ -122,6 +124,9 @@ async function getFirebaseModules() {
     collection: firestore.collection,
     addDoc: firestore.addDoc,
     getDocs: firestore.getDocs,
+    doc: firestore.doc,
+    updateDoc: firestore.updateDoc,
+    deleteDoc: firestore.deleteDoc,
   };
 }
 
@@ -166,21 +171,13 @@ export default function WashPage() {
         const snapshot = await getDocs(collection(db, 'washRecords'));
 
         if (!snapshot.empty) {
-          const firestoreDocs = snapshot.docs.map((doc, index) => {
-            const data = doc.data() as FirestoreWashRecord;
-            return {
-              data,
-              fallbackId: Date.now() + index,
-            };
-          });
-
-          const createdOnly = firestoreDocs.filter(
-            (item) => item.data.mode !== 'edit'
-          );
-
-          const firestoreRecords = createdOnly
-            .map((item) =>
-              normalizeFirestoreRecord(item.data, item.fallbackId)
+          const firestoreRecords = snapshot.docs
+            .map((docItem, index) =>
+              normalizeFirestoreRecord(
+                docItem.id,
+                docItem.data() as FirestoreWashRecord,
+                Date.now() + index
+              )
             )
             .filter((record) => record.date && record.menus.length > 0)
             .sort((a, b) => {
@@ -299,9 +296,26 @@ export default function WashPage() {
     }
 
     try {
-      const { db, collection, addDoc } = await getFirebaseModules();
+      const { db, collection, addDoc, doc, updateDoc } =
+        await getFirebaseModules();
 
       if (editingId !== null) {
+        const targetRecord = records.find((record) => record.id === editingId);
+
+        if (!targetRecord?.docId) {
+          setSavedMessage('更新対象のFirebaseデータが見つかりませんでした');
+          return;
+        }
+
+        await updateDoc(doc(db, 'washRecords', targetRecord.docId), {
+          date,
+          menus: selectedMenus,
+          memo,
+          products,
+          image: image ?? null,
+          updatedAt: new Date().toISOString(),
+        });
+
         const updatedRecords = records.map((record) =>
           record.id === editingId
             ? {
@@ -316,22 +330,10 @@ export default function WashPage() {
         );
 
         setRecords(updatedRecords);
-
-        await addDoc(collection(db, 'washRecords'), {
-          mode: 'edit',
-          originalId: editingId,
-          date,
-          menus: selectedMenus,
-          memo,
-          products,
-          image: image ?? null,
-          createdAt: new Date().toISOString(),
-        });
-
         setSavedMessage('洗車記録を更新しました');
         setEditingId(null);
       } else {
-        const newRecord: WashRecord = {
+        const newRecordBase = {
           id: Date.now(),
           date,
           menus: selectedMenus,
@@ -340,19 +342,18 @@ export default function WashPage() {
           image: image ?? undefined,
         };
 
-        setRecords((prev) => [newRecord, ...prev]);
-
-        await addDoc(collection(db, 'washRecords'), {
-          mode: 'create',
-          id: newRecord.id,
-          date,
-          menus: selectedMenus,
-          memo,
-          products,
+        const docRef = await addDoc(collection(db, 'washRecords'), {
+          ...newRecordBase,
           image: image ?? null,
           createdAt: new Date().toISOString(),
         });
 
+        const newRecord: WashRecord = {
+          ...newRecordBase,
+          docId: docRef.id,
+        };
+
+        setRecords((prev) => [newRecord, ...prev]);
         setSavedMessage('洗車記録を保存しました');
       }
 
@@ -386,7 +387,7 @@ export default function WashPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleDelete(id: number) {
+  async function handleDelete(id: number) {
     const targetRecord = records.find((record) => record.id === id);
 
     if (!targetRecord) return;
@@ -397,20 +398,34 @@ export default function WashPage() {
 
     if (!ok) return;
 
-    const nextRecords = records.filter((record) => record.id !== id);
-    setRecords(nextRecords);
+    try {
+      if (targetRecord.docId) {
+        const { db, doc, deleteDoc } = await getFirebaseModules();
+        await deleteDoc(doc(db, 'washRecords', targetRecord.docId));
+      }
 
-    if (editingId === id) {
-      setEditingId(null);
-      setDate('');
-      setSelectedMenus([]);
-      setMemo('');
-      setProducts('');
-      setImage(null);
-      setErrors({});
+      const nextRecords = records.filter((record) => record.id !== id);
+      setRecords(nextRecords);
+
+      if (editingId === id) {
+        setEditingId(null);
+        setDate('');
+        setSelectedMenus([]);
+        setMemo('');
+        setProducts('');
+        setImage(null);
+        setErrors({});
+      }
+
+      setSavedMessage('洗車記録を削除しました');
+    } catch (error) {
+      console.error('Firestoreからの削除に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(`Firebase削除失敗: ${errorMessage}`);
     }
-
-    setSavedMessage('洗車記録を削除しました');
   }
 
   function handleCancelEdit() {
