@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-<p style={{ color: 'red', fontWeight: 'bold' }}>DEPLOY TEST 123</p>
-
 type FuelRecord = {
   id: number;
+  docId?: string;
   date: string;
   odometer?: string;
   liters?: string;
@@ -15,15 +14,18 @@ type FuelRecord = {
 
 type WashRecord = {
   id: number;
+  docId?: string;
   date: string;
   menu?: string;
   menus?: string[];
   memo?: string;
   image?: string;
+  products?: string;
 };
 
 type MaintenanceRecord = {
   id: number;
+  docId?: string;
   date: string;
   menu?: string;
   price?: string;
@@ -32,8 +34,10 @@ type MaintenanceRecord = {
 
 type MileageRecord = {
   id: number;
+  docId?: string;
   date: string;
   distance?: string;
+  memo?: string;
 };
 
 type RecentActivity = {
@@ -43,6 +47,39 @@ type RecentActivity = {
   title: string;
   subtitle: string;
   icon: string;
+};
+
+type FirestoreFuelRecord = {
+  id?: number;
+  date?: string;
+  odometer?: string;
+  liters?: string;
+  price?: string;
+};
+
+type FirestoreWashRecord = {
+  id?: number;
+  date?: string;
+  menu?: string;
+  menus?: string[];
+  memo?: string;
+  image?: string | null;
+  products?: string;
+};
+
+type FirestoreMaintenanceRecord = {
+  id?: number;
+  date?: string;
+  menu?: string;
+  price?: string;
+  memo?: string;
+};
+
+type FirestoreMileageRecord = {
+  id?: number;
+  date?: string;
+  distance?: string;
+  memo?: string;
 };
 
 const DEFAULT_FUEL_RECORDS: FuelRecord[] = [
@@ -94,6 +131,19 @@ const DEFAULT_MILEAGE_RECORDS: MileageRecord[] = [
     distance: '44800',
   },
 ];
+
+async function getFirebaseModules() {
+  const [{ db }, firestore] = await Promise.all([
+    import('@/lib/firebase'),
+    import('firebase/firestore/lite'),
+  ]);
+
+  return {
+    db,
+    collection: firestore.collection,
+    getDocs: firestore.getDocs,
+  };
+}
 
 function getLatestByDate<T extends { date?: string }>(records: T[]) {
   if (!records.length) return null;
@@ -199,36 +249,99 @@ export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const savedFuel = window.localStorage.getItem('fuel-records');
-      const savedWash = window.localStorage.getItem('wash-records');
-      const savedMaintenance = window.localStorage.getItem('maintenance-records');
-      const savedMileage = window.localStorage.getItem('mileage-records');
+    async function loadDashboardData() {
+      try {
+        const { db, collection, getDocs } = await getFirebaseModules();
 
-      setFuelRecords(
-        savedFuel ? (JSON.parse(savedFuel) as FuelRecord[]) : DEFAULT_FUEL_RECORDS
-      );
-      setWashRecords(
-        savedWash ? (JSON.parse(savedWash) as WashRecord[]) : DEFAULT_WASH_RECORDS
-      );
-      setMaintenanceRecords(
-        savedMaintenance
-          ? (JSON.parse(savedMaintenance) as MaintenanceRecord[])
-          : DEFAULT_MAINTENANCE_RECORDS
-      );
-      setMileageRecords(
-        savedMileage
-          ? (JSON.parse(savedMileage) as MileageRecord[])
-          : DEFAULT_MILEAGE_RECORDS
-      );
-    } catch {
-      setFuelRecords(DEFAULT_FUEL_RECORDS);
-      setWashRecords(DEFAULT_WASH_RECORDS);
-      setMaintenanceRecords(DEFAULT_MAINTENANCE_RECORDS);
-      setMileageRecords(DEFAULT_MILEAGE_RECORDS);
+        const [fuelSnapshot, washSnapshot, maintenanceSnapshot, mileageSnapshot] =
+          await Promise.all([
+            getDocs(collection(db, 'fuelRecords')),
+            getDocs(collection(db, 'washRecords')),
+            getDocs(collection(db, 'maintenanceRecords')),
+            getDocs(collection(db, 'mileageRecords')),
+          ]);
+
+        const loadedFuelRecords: FuelRecord[] = !fuelSnapshot.empty
+          ? fuelSnapshot.docs
+              .map((docItem, index) => {
+                const data = docItem.data() as FirestoreFuelRecord;
+                return {
+                  id: typeof data.id === 'number' ? data.id : Date.now() + index,
+                  docId: docItem.id,
+                  date: data.date ?? '',
+                  odometer: data.odometer ?? '',
+                  liters: data.liters ?? '',
+                  price: data.price ?? '',
+                };
+              })
+              .filter((record) => record.date)
+          : DEFAULT_FUEL_RECORDS;
+
+        const loadedWashRecords: WashRecord[] = !washSnapshot.empty
+          ? washSnapshot.docs
+              .map((docItem, index) => {
+                const data = docItem.data() as FirestoreWashRecord;
+                return {
+                  id: typeof data.id === 'number' ? data.id : Date.now() + index + 1000,
+                  docId: docItem.id,
+                  date: data.date ?? '',
+                  menu: data.menu ?? '',
+                  menus: Array.isArray(data.menus) ? data.menus : [],
+                  memo: data.memo ?? '',
+                  image: data.image ?? undefined,
+                  products: data.products ?? '',
+                };
+              })
+              .filter((record) => record.date)
+          : DEFAULT_WASH_RECORDS;
+
+        const loadedMaintenanceRecords: MaintenanceRecord[] = !maintenanceSnapshot.empty
+          ? maintenanceSnapshot.docs
+              .map((docItem, index) => {
+                const data = docItem.data() as FirestoreMaintenanceRecord;
+                return {
+                  id: typeof data.id === 'number' ? data.id : Date.now() + index + 2000,
+                  docId: docItem.id,
+                  date: data.date ?? '',
+                  menu: data.menu ?? '',
+                  price: data.price ?? '',
+                  memo: data.memo ?? '',
+                };
+              })
+              .filter((record) => record.date)
+          : DEFAULT_MAINTENANCE_RECORDS;
+
+        const loadedMileageRecords: MileageRecord[] = !mileageSnapshot.empty
+          ? mileageSnapshot.docs
+              .map((docItem, index) => {
+                const data = docItem.data() as FirestoreMileageRecord;
+                return {
+                  id: typeof data.id === 'number' ? data.id : Date.now() + index + 3000,
+                  docId: docItem.id,
+                  date: data.date ?? '',
+                  distance: data.distance ?? '',
+                  memo: data.memo ?? '',
+                };
+              })
+              .filter((record) => record.date)
+          : DEFAULT_MILEAGE_RECORDS;
+
+        setFuelRecords(loadedFuelRecords);
+        setWashRecords(loadedWashRecords);
+        setMaintenanceRecords(loadedMaintenanceRecords);
+        setMileageRecords(loadedMileageRecords);
+      } catch (error) {
+        console.error('ダッシュボードのFirebase読み込みに失敗しました:', error);
+        setFuelRecords(DEFAULT_FUEL_RECORDS);
+        setWashRecords(DEFAULT_WASH_RECORDS);
+        setMaintenanceRecords(DEFAULT_MAINTENANCE_RECORDS);
+        setMileageRecords(DEFAULT_MILEAGE_RECORDS);
+      } finally {
+        setIsLoaded(true);
+      }
     }
 
-    setIsLoaded(true);
+    loadDashboardData();
   }, []);
 
   const latestFuel = useMemo(() => getLatestByDate(fuelRecords), [fuelRecords]);
