@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Car Maintenance App',
-    short_name: 'Car Care',
+    name: 'カーメンテナンス',
+    short_name: 'カーメンテ',
     description: '車のメンテナンス管理アプリ',
     start_url: '/',
     display: 'standalone',
