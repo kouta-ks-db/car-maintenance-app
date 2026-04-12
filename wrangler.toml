@@ -1,0 +1,8 @@
+name = "car-maintenance-app"
+compatibility_date = "2026-04-12"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "car-maintenance-db"
+database_id = "69c04c56-0ca1-442d-a7c7-46f8814c68d8"
