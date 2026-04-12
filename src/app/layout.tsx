@@ -9,24 +9,20 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.png',
     apple: '/apple-icon.png',
+    shortcut: '/icon.png',
   },
   appleWebApp: {
     capable: true,
     title: 'カーメンテ',
     statusBarStyle: 'default',
   },
-  other: {
-    'apple-mobile-web-app-title': 'カーメンテ',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
-  },
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="ja">
       <body>{children}</body>
