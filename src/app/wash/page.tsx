@@ -41,10 +41,10 @@ type WashErrors = {
   menus?: string;
 };
 
-type WashImageMap = Record<string, string>;
-
 const TEXT_STORAGE_KEY = 'wash-records-text';
-const IMAGE_STORAGE_KEY = 'wash-record-images';
+const DB_NAME = 'car-maintenance-local-db';
+const DB_VERSION = 1;
+const IMAGE_STORE_NAME = 'wash-images';
 
 const WASH_MENU_OPTIONS: WashMenu[] = [
   '手洗い洗車',
@@ -74,65 +74,6 @@ async function getFirebaseModules() {
   };
 }
 
-function getImageMap(): WashImageMap {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(IMAGE_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as WashImageMap;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveImageMap(map: WashImageMap) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(IMAGE_STORAGE_KEY, JSON.stringify(map));
-}
-
-function setImageForRecordKey(recordKey: string, image: string | null) {
-  const map = getImageMap();
-
-  if (image) {
-    map[recordKey] = image;
-  } else {
-    delete map[recordKey];
-  }
-
-  saveImageMap(map);
-}
-
-function removeImageForRecordKey(recordKey: string) {
-  const map = getImageMap();
-  delete map[recordKey];
-  saveImageMap(map);
-}
-
-function getRecordKey(record: { docId?: string; id: number }) {
-  return record.docId ?? `local-${record.id}`;
-}
-
-function normalizeFirestoreRecord(
-  docId: string,
-  record: FirestoreWashRecord,
-  fallbackId: number,
-  imageMap: WashImageMap
-): WashRecord {
-  const id = typeof record.id === 'number' ? record.id : fallbackId;
-  const recordKey = docId;
-
-  return {
-    id,
-    docId,
-    date: record.date ?? '',
-    menus: Array.isArray(record.menus) ? record.menus : [],
-    memo: record.memo ?? '',
-    products: record.products ?? '',
-    image: imageMap[recordKey],
-  };
-}
-
 function labelStyle() {
   return {
     display: 'block',
@@ -155,6 +96,117 @@ function inputStyle(hasError = false) {
   } as const;
 }
 
+function getRecordKey(record: { docId?: string; id: number }) {
+  return record.docId ?? `local-${record.id}`;
+}
+
+function openWashImageDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDBが利用できません'));
+      return;
+    }
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(IMAGE_STORE_NAME)) {
+        db.createObjectStore(IMAGE_STORE_NAME);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () =>
+      reject(request.error ?? new Error('IndexedDBのオープンに失敗しました'));
+  });
+}
+
+async function getWashImage(recordKey: string): Promise<string | undefined> {
+  const db = await openWashImageDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_STORE_NAME, 'readonly');
+    const store = tx.objectStore(IMAGE_STORE_NAME);
+    const request = store.get(recordKey);
+
+    request.onsuccess = () => {
+      resolve(typeof request.result === 'string' ? request.result : undefined);
+    };
+
+    request.onerror = () =>
+      reject(request.error ?? new Error('画像の読み込みに失敗しました'));
+
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  });
+}
+
+async function setWashImage(recordKey: string, image: string | null): Promise<void> {
+  const db = await openWashImageDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(IMAGE_STORE_NAME);
+
+    const request = image ? store.put(image, recordKey) : store.delete(recordKey);
+
+    request.onerror = () =>
+      reject(request.error ?? new Error('画像の保存に失敗しました'));
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error ?? new Error('画像の保存トランザクションに失敗しました'));
+    };
+  });
+}
+
+async function deleteWashImage(recordKey: string): Promise<void> {
+  await setWashImage(recordKey, null);
+}
+
+async function hydrateImages(records: WashRecord[]): Promise<WashRecord[]> {
+  const hydrated = await Promise.all(
+    records.map(async (record) => {
+      try {
+        const image = await getWashImage(getRecordKey(record));
+        return {
+          ...record,
+          image,
+        };
+      } catch {
+        return {
+          ...record,
+          image: undefined,
+        };
+      }
+    })
+  );
+
+  return hydrated;
+}
+
+function normalizeFirestoreRecord(
+  docId: string,
+  record: FirestoreWashRecord,
+  fallbackId: number
+): WashRecord {
+  return {
+    id: typeof record.id === 'number' ? record.id : fallbackId,
+    docId,
+    date: record.date ?? '',
+    menus: Array.isArray(record.menus) ? record.menus : [],
+    memo: record.memo ?? '',
+    products: record.products ?? '',
+  };
+}
+
 export default function WashPage() {
   const [date, setDate] = useState('');
   const [selectedMenus, setSelectedMenus] = useState<WashMenu[]>([]);
@@ -170,7 +222,6 @@ export default function WashPage() {
   useEffect(() => {
     async function loadRecords() {
       try {
-        const imageMap = getImageMap();
         const { db, collection, getDocs } = await getFirebaseModules();
         const snapshot = await getDocs(collection(db, 'washRecords'));
 
@@ -180,8 +231,7 @@ export default function WashPage() {
               normalizeFirestoreRecord(
                 docItem.id,
                 docItem.data() as FirestoreWashRecord,
-                Date.now() + index,
-                imageMap
+                Date.now() + index
               )
             )
             .filter((record) => record.date && record.menus.length > 0)
@@ -191,11 +241,10 @@ export default function WashPage() {
               return bTime - aTime;
             });
 
-          setRecords(firestoreRecords);
+          const recordsWithImages = await hydrateImages(firestoreRecords);
+          setRecords(recordsWithImages);
 
-          const textOnlyRecords = firestoreRecords.map(
-            ({ image: _image, ...rest }) => rest
-          );
+          const textOnlyRecords = firestoreRecords.map(({ image: _image, ...rest }) => rest);
           window.localStorage.setItem(
             TEXT_STORAGE_KEY,
             JSON.stringify(textOnlyRecords)
@@ -207,16 +256,11 @@ export default function WashPage() {
         }
 
         const savedTextRecords = window.localStorage.getItem(TEXT_STORAGE_KEY);
+
         if (savedTextRecords) {
           const parsed = JSON.parse(savedTextRecords) as Omit<WashRecord, 'image'>[];
-          const imageMapLocal = getImageMap();
-
-          const mergedRecords: WashRecord[] = parsed.map((record) => ({
-            ...record,
-            image: imageMapLocal[getRecordKey(record)],
-          }));
-
-          setRecords(mergedRecords);
+          const recordsWithImages = await hydrateImages(parsed as WashRecord[]);
+          setRecords(recordsWithImages);
           setSavedMessage('localStorageから洗車記録を読み込みました');
         } else {
           setRecords([]);
@@ -224,21 +268,17 @@ export default function WashPage() {
         }
       } catch (error) {
         console.error('Firestoreからの読み込みに失敗しました:', error);
+
         const errorMessage =
           error instanceof Error ? error.message : 'unknown error';
 
         const savedTextRecords = window.localStorage.getItem(TEXT_STORAGE_KEY);
+
         if (savedTextRecords) {
           try {
             const parsed = JSON.parse(savedTextRecords) as Omit<WashRecord, 'image'>[];
-            const imageMapLocal = getImageMap();
-
-            const mergedRecords: WashRecord[] = parsed.map((record) => ({
-              ...record,
-              image: imageMapLocal[getRecordKey(record)],
-            }));
-
-            setRecords(mergedRecords);
+            const recordsWithImages = await hydrateImages(parsed as WashRecord[]);
+            setRecords(recordsWithImages);
             setSavedMessage(
               `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
             );
@@ -319,7 +359,6 @@ export default function WashPage() {
           return;
         }
 
-        // Firestoreには image を送らない
         await updateDoc(doc(db, 'washRecords', targetRecord.docId), {
           date,
           menus: selectedMenus,
@@ -341,7 +380,7 @@ export default function WashPage() {
             : record
         );
 
-        setImageForRecordKey(targetRecord.docId, image ?? null);
+        await setWashImage(targetRecord.docId, image ?? null);
 
         setRecords(updatedRecords);
         setSavedMessage('洗車記録を更新しました');
@@ -355,19 +394,18 @@ export default function WashPage() {
           products,
         };
 
-        // Firestoreには image を送らない
         const docRef = await addDoc(collection(db, 'washRecords'), {
           ...newRecordBase,
           createdAt: new Date().toISOString(),
         });
+
+        await setWashImage(docRef.id, image ?? null);
 
         const newRecord: WashRecord = {
           ...newRecordBase,
           docId: docRef.id,
           image: image ?? undefined,
         };
-
-        setImageForRecordKey(docRef.id, image ?? null);
 
         setRecords((prev) => [newRecord, ...prev]);
         setSavedMessage('洗車記録を保存しました');
@@ -380,14 +418,12 @@ export default function WashPage() {
       setImage(null);
       setErrors({});
     } catch (error) {
-      console.error('Firestoreへの保存に失敗しました:', error);
+      console.error('保存に失敗しました:', error);
 
       const errorMessage =
         error instanceof Error ? error.message : 'unknown error';
 
-      setSavedMessage(
-        `Firebase保存失敗: ${errorMessage} / 画像はローカル保存のみです`
-      );
+      setSavedMessage(`保存失敗: ${errorMessage}`);
     }
   }
 
@@ -416,9 +452,9 @@ export default function WashPage() {
       if (targetRecord.docId) {
         const { db, doc, deleteDoc } = await getFirebaseModules();
         await deleteDoc(doc(db, 'washRecords', targetRecord.docId));
-        removeImageForRecordKey(targetRecord.docId);
+        await deleteWashImage(targetRecord.docId);
       } else {
-        removeImageForRecordKey(getRecordKey(targetRecord));
+        await deleteWashImage(getRecordKey(targetRecord));
       }
 
       const nextRecords = records.filter((record) => record.id !== id);
@@ -436,12 +472,12 @@ export default function WashPage() {
 
       setSavedMessage('洗車記録を削除しました');
     } catch (error) {
-      console.error('Firestoreからの削除に失敗しました:', error);
+      console.error('削除に失敗しました:', error);
 
       const errorMessage =
         error instanceof Error ? error.message : 'unknown error';
 
-      setSavedMessage(`Firebase削除失敗: ${errorMessage}`);
+      setSavedMessage(`削除失敗: ${errorMessage}`);
     }
   }
 
