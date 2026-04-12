@@ -1,0 +1,12 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/favicon.ico/route": "/favicon.ico",
+  "/fuel/page": "/fuel",
+  "/icon.png/route": "/icon.png",
+  "/maintenance/page": "/maintenance",
+  "/manifest.webmanifest/route": "/manifest.webmanifest",
+  "/mileage/page": "/mileage",
+  "/page": "/",
+  "/wash/page": "/wash"
+}

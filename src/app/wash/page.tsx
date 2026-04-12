@@ -2,9 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  orderBy,
+  query,
+} from 'firebase/firestore';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
+import { db } from '@/lib/firebase';
 
 type WashMenu =
   | '手洗い洗車'
@@ -33,6 +41,17 @@ type OldWashRecord = {
   memo?: string;
   image?: string;
   products?: string;
+};
+
+type FirestoreWashRecord = {
+  id?: number;
+  date?: string;
+  menus?: WashMenu[];
+  memo?: string;
+  image?: string | null;
+  products?: string;
+  createdAt?: string;
+  mode?: string;
 };
 
 type WashErrors = {
@@ -85,6 +104,20 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
   };
 }
 
+function normalizeFirestoreRecord(
+  docId: string,
+  record: FirestoreWashRecord
+): WashRecord {
+  return {
+    id: typeof record.id === 'number' ? record.id : Number(docId.replace(/\D/g, '').slice(0, 12)) || Date.now(),
+    date: record.date ?? '',
+    menus: Array.isArray(record.menus) ? record.menus : [],
+    memo: record.memo ?? '',
+    image: record.image ?? undefined,
+    products: record.products ?? '',
+  };
+}
+
 function labelStyle() {
   return {
     display: 'block',
@@ -120,23 +153,72 @@ export default function WashPage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const savedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-    if (savedRecords) {
+    async function loadRecords() {
       try {
-        const parsed = JSON.parse(savedRecords) as OldWashRecord[];
-        const normalized = Array.isArray(parsed)
-          ? parsed.map(normalizeRecord)
-          : DEFAULT_RECORDS;
-        setRecords(normalized);
-      } catch {
-        setRecords(DEFAULT_RECORDS);
+        const q = query(
+          collection(db, 'washRecords'),
+          orderBy('createdAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const firestoreRecords = snapshot.docs
+            .map((doc) =>
+              normalizeFirestoreRecord(
+                doc.id,
+                doc.data() as FirestoreWashRecord
+              )
+            )
+            .filter((record) => record.date && record.menus.length > 0);
+
+          setRecords(firestoreRecords);
+          window.localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(firestoreRecords)
+          );
+          setIsLoaded(true);
+          return;
+        }
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldWashRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+        }
+      } catch (error) {
+        console.error('Firestoreからの読み込みに失敗しました:', error);
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldWashRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+        }
+      } finally {
+        setIsLoaded(true);
       }
-    } else {
-      setRecords(DEFAULT_RECORDS);
     }
 
-    setIsLoaded(true);
+    loadRecords();
   }, []);
 
   useEffect(() => {
@@ -164,7 +246,7 @@ export default function WashPage() {
     setErrors((prev) => ({ ...prev, menus: undefined }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     const newErrors: WashErrors = {};
 
     if (!date) {
@@ -182,43 +264,72 @@ export default function WashPage() {
       return;
     }
 
-    if (editingId !== null) {
-      const updatedRecords = records.map((record) =>
-        record.id === editingId
-          ? {
-              ...record,
-              date,
-              menus: selectedMenus,
-              memo,
-              products,
-              image: image ?? undefined,
-            }
-          : record
-      );
+    try {
+      if (editingId !== null) {
+        const updatedRecords = records.map((record) =>
+          record.id === editingId
+            ? {
+                ...record,
+                date,
+                menus: selectedMenus,
+                memo,
+                products,
+                image: image ?? undefined,
+              }
+            : record
+        );
 
-      setRecords(updatedRecords);
-      setSavedMessage('洗車記録を更新しました');
-      setEditingId(null);
-    } else {
-      const newRecord: WashRecord = {
-        id: Date.now(),
-        date,
-        menus: selectedMenus,
-        memo,
-        products,
-        image: image ?? undefined,
-      };
+        setRecords(updatedRecords);
 
-      setRecords([newRecord, ...records]);
-      setSavedMessage('洗車記録を保存しました');
+        await addDoc(collection(db, 'washRecords'), {
+          mode: 'edit',
+          originalId: editingId,
+          date,
+          menus: selectedMenus,
+          memo,
+          products,
+          image: image ?? null,
+          createdAt: new Date().toISOString(),
+        });
+
+        setSavedMessage('洗車記録を更新しました');
+        setEditingId(null);
+      } else {
+        const newRecord: WashRecord = {
+          id: Date.now(),
+          date,
+          menus: selectedMenus,
+          memo,
+          products,
+          image: image ?? undefined,
+        };
+
+        setRecords((prev) => [newRecord, ...prev]);
+
+        await addDoc(collection(db, 'washRecords'), {
+          mode: 'create',
+          id: newRecord.id,
+          date,
+          menus: selectedMenus,
+          memo,
+          products,
+          image: image ?? null,
+          createdAt: new Date().toISOString(),
+        });
+
+        setSavedMessage('洗車記録を保存しました');
+      }
+
+      setDate('');
+      setSelectedMenus([]);
+      setMemo('');
+      setProducts('');
+      setImage(null);
+      setErrors({});
+    } catch (error) {
+      console.error('Firestoreへの保存に失敗しました:', error);
+      setSavedMessage('Firebase保存でエラーが出ました。localStorageへの保存状態を確認してください');
     }
-
-    setDate('');
-    setSelectedMenus([]);
-    setMemo('');
-    setProducts('');
-    setImage(null);
-    setErrors({});
   }
 
   function handleEdit(record: WashRecord) {
