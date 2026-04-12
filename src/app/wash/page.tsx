@@ -89,8 +89,8 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
     menus: Array.isArray(record.menus)
       ? record.menus
       : record.menu
-      ? [record.menu as WashMenu]
-      : [],
+        ? [record.menu as WashMenu]
+        : [],
     memo: record.memo ?? '',
     image: record.image,
     products: record.products ?? '',
@@ -220,6 +220,9 @@ export default function WashPage() {
       } catch (error) {
         console.error('Firestoreからの読み込みに失敗しました:', error);
 
+        const errorMessage =
+          error instanceof Error ? error.message : 'unknown error';
+
         const savedRecords = window.localStorage.getItem(STORAGE_KEY);
 
         if (savedRecords) {
@@ -230,18 +233,18 @@ export default function WashPage() {
               : DEFAULT_RECORDS;
             setRecords(normalized);
             setSavedMessage(
-              'Firebase読み込み失敗のためlocalStorageを表示しています'
+              `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
             );
           } catch {
             setRecords(DEFAULT_RECORDS);
             setSavedMessage(
-              'Firebase読み込み失敗のため初期データを表示しています'
+              `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
             );
           }
         } else {
           setRecords(DEFAULT_RECORDS);
           setSavedMessage(
-            'Firebase読み込み失敗のため初期データを表示しています'
+            `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
           );
         }
       } finally {
@@ -361,8 +364,12 @@ export default function WashPage() {
       setErrors({});
     } catch (error) {
       console.error('Firestoreへの保存に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
       setSavedMessage(
-        'Firebase保存でエラーが出ました。localStorageへの保存状態を確認してください'
+        `Firebase保存失敗: ${errorMessage} / localStorageへの保存状態を確認してください`
       );
     }
   }
