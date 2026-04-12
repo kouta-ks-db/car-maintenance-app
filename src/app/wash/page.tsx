@@ -41,7 +41,6 @@ type FirestoreWashRecord = {
   date?: string;
   menus?: WashMenu[];
   memo?: string;
-  image?: string | null;
   products?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -52,7 +51,10 @@ type WashErrors = {
   menus?: string;
 };
 
+type WashImageMap = Record<string, string>;
+
 const STORAGE_KEY = 'wash-records';
+const IMAGE_STORAGE_KEY = 'wash-record-images';
 
 const WASH_MENU_OPTIONS: WashMenu[] = [
   '手洗い洗車',
@@ -100,15 +102,19 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
 function normalizeFirestoreRecord(
   docId: string,
   record: FirestoreWashRecord,
-  fallbackId: number
+  fallbackId: number,
+  imageMap: WashImageMap
 ): WashRecord {
+  const recordId = typeof record.id === 'number' ? record.id : fallbackId;
+  const localImage = imageMap[docId] ?? imageMap[String(recordId)];
+
   return {
-    id: typeof record.id === 'number' ? record.id : fallbackId,
+    id: recordId,
     docId,
     date: record.date ?? '',
     menus: Array.isArray(record.menus) ? record.menus : [],
     memo: record.memo ?? '',
-    image: record.image ?? undefined,
+    image: localImage,
     products: record.products ?? '',
   };
 }
@@ -128,6 +134,51 @@ async function getFirebaseModules() {
     updateDoc: firestore.updateDoc,
     deleteDoc: firestore.deleteDoc,
   };
+}
+
+function getImageMap(): WashImageMap {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(IMAGE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as WashImageMap;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveImageMap(map: WashImageMap) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(IMAGE_STORAGE_KEY, JSON.stringify(map));
+}
+
+function setImageForKeys(keys: string[], image: string | null) {
+  const map = getImageMap();
+
+  keys.forEach((key) => {
+    if (!key) return;
+
+    if (image) {
+      map[key] = image;
+    } else {
+      delete map[key];
+    }
+  });
+
+  saveImageMap(map);
+}
+
+function removeImageForKeys(keys: string[]) {
+  const map = getImageMap();
+
+  keys.forEach((key) => {
+    if (!key) return;
+    delete map[key];
+  });
+
+  saveImageMap(map);
 }
 
 function labelStyle() {
@@ -167,6 +218,7 @@ export default function WashPage() {
   useEffect(() => {
     async function loadRecords() {
       try {
+        const imageMap = getImageMap();
         const { db, collection, getDocs } = await getFirebaseModules();
         const snapshot = await getDocs(collection(db, 'washRecords'));
 
@@ -176,7 +228,8 @@ export default function WashPage() {
               normalizeFirestoreRecord(
                 docItem.id,
                 docItem.data() as FirestoreWashRecord,
-                Date.now() + index
+                Date.now() + index,
+                imageMap
               )
             )
             .filter((record) => record.date && record.menus.length > 0)
@@ -187,10 +240,7 @@ export default function WashPage() {
             });
 
           setRecords(firestoreRecords);
-          window.localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify(firestoreRecords)
-          );
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreRecords));
           setSavedMessage('Firebaseから洗車記録を読み込みました');
           setIsLoaded(true);
           return;
@@ -312,7 +362,6 @@ export default function WashPage() {
           menus: selectedMenus,
           memo,
           products,
-          image: image ?? null,
           updatedAt: new Date().toISOString(),
         });
 
@@ -329,6 +378,11 @@ export default function WashPage() {
             : record
         );
 
+        setImageForKeys(
+          [targetRecord.docId, String(targetRecord.id)],
+          image ?? null
+        );
+
         setRecords(updatedRecords);
         setSavedMessage('洗車記録を更新しました');
         setEditingId(null);
@@ -339,19 +393,20 @@ export default function WashPage() {
           menus: selectedMenus,
           memo,
           products,
-          image: image ?? undefined,
         };
 
         const docRef = await addDoc(collection(db, 'washRecords'), {
           ...newRecordBase,
-          image: image ?? null,
           createdAt: new Date().toISOString(),
         });
 
         const newRecord: WashRecord = {
           ...newRecordBase,
           docId: docRef.id,
+          image: image ?? undefined,
         };
+
+        setImageForKeys([docRef.id, String(newRecord.id)], image ?? null);
 
         setRecords((prev) => [newRecord, ...prev]);
         setSavedMessage('洗車記録を保存しました');
@@ -370,7 +425,7 @@ export default function WashPage() {
         error instanceof Error ? error.message : 'unknown error';
 
       setSavedMessage(
-        `Firebase保存失敗: ${errorMessage} / localStorageへの保存状態を確認してください`
+        `Firebase保存失敗: ${errorMessage} / 画像はローカル保存です`
       );
     }
   }
@@ -403,6 +458,11 @@ export default function WashPage() {
         const { db, doc, deleteDoc } = await getFirebaseModules();
         await deleteDoc(doc(db, 'washRecords', targetRecord.docId));
       }
+
+      removeImageForKeys([
+        targetRecord.docId ?? '',
+        String(targetRecord.id),
+      ]);
 
       const nextRecords = records.filter((record) => record.id !== id);
       setRecords(nextRecords);
@@ -555,7 +615,7 @@ export default function WashPage() {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle()}>写真</label>
+            <label style={labelStyle()}>写真（この端末のみに保存）</label>
 
             <div
               style={{
