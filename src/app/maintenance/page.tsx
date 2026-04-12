@@ -6,14 +6,36 @@ import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
 
-type MaintenanceMenu = 'インテリア追加' | 'エクステリア追加' | 'パーツ交換';
+type MaintenanceMenu =
+  | 'インテリア追加'
+  | 'エクステリア追加'
+  | 'パーツ交換';
 
 type MaintenanceRecord = {
   id: number;
+  docId?: string;
   date: string;
   menu: MaintenanceMenu;
   price: string;
   memo: string;
+};
+
+type OldMaintenanceRecord = {
+  id: number;
+  date: string;
+  menu?: string;
+  price?: string;
+  memo?: string;
+};
+
+type FirestoreMaintenanceRecord = {
+  id?: number;
+  date?: string;
+  menu?: MaintenanceMenu;
+  price?: string;
+  memo?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type MaintenanceErrors = {
@@ -22,17 +44,9 @@ type MaintenanceErrors = {
   price?: string;
 };
 
-type OldMaintenanceRecord = {
-  id: number;
-  date: string;
-  menu: MaintenanceMenu;
-  price?: string;
-  memo?: string;
-};
-
 const STORAGE_KEY = 'maintenance-records';
 
-const MAINTENANCE_MENU_OPTIONS: MaintenanceMenu[] = [
+const MENU_OPTIONS: MaintenanceMenu[] = [
   'インテリア追加',
   'エクステリア追加',
   'パーツ交換',
@@ -55,13 +69,45 @@ const DEFAULT_RECORDS: MaintenanceRecord[] = [
   },
 ];
 
-function normalizeRecord(record: OldMaintenanceRecord): MaintenanceRecord {
+function normalizeLocalRecord(record: OldMaintenanceRecord): MaintenanceRecord {
   return {
     id: record.id,
     date: record.date ?? '',
-    menu: record.menu,
+    menu: (record.menu as MaintenanceMenu) ?? 'インテリア追加',
     price: record.price ?? '',
     memo: record.memo ?? '',
+  };
+}
+
+function normalizeFirestoreRecord(
+  docId: string,
+  record: FirestoreMaintenanceRecord,
+  fallbackId: number
+): MaintenanceRecord {
+  return {
+    id: typeof record.id === 'number' ? record.id : fallbackId,
+    docId,
+    date: record.date ?? '',
+    menu: record.menu ?? 'インテリア追加',
+    price: record.price ?? '',
+    memo: record.memo ?? '',
+  };
+}
+
+async function getFirebaseModules() {
+  const [{ db }, firestore] = await Promise.all([
+    import('@/lib/firebase'),
+    import('firebase/firestore/lite'),
+  ]);
+
+  return {
+    db,
+    collection: firestore.collection,
+    addDoc: firestore.addDoc,
+    getDocs: firestore.getDocs,
+    doc: firestore.doc,
+    updateDoc: firestore.updateDoc,
+    deleteDoc: firestore.deleteDoc,
   };
 }
 
@@ -89,7 +135,7 @@ function inputStyle(hasError = false) {
 
 export default function MaintenancePage() {
   const [date, setDate] = useState('');
-  const [menu, setMenu] = useState('');
+  const [menu, setMenu] = useState<MaintenanceMenu>('インテリア追加');
   const [price, setPrice] = useState('');
   const [memo, setMemo] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,23 +145,91 @@ export default function MaintenancePage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const savedRecords = window.localStorage.getItem(STORAGE_KEY);
-
-    if (savedRecords) {
+    async function loadRecords() {
       try {
-        const parsed = JSON.parse(savedRecords) as OldMaintenanceRecord[];
-        const normalized = Array.isArray(parsed)
-          ? parsed.map(normalizeRecord)
-          : DEFAULT_RECORDS;
-        setRecords(normalized);
-      } catch {
-        setRecords(DEFAULT_RECORDS);
+        const { db, collection, getDocs } = await getFirebaseModules();
+        const snapshot = await getDocs(collection(db, 'maintenanceRecords'));
+
+        if (!snapshot.empty) {
+          const firestoreRecords = snapshot.docs
+            .map((docItem, index) =>
+              normalizeFirestoreRecord(
+                docItem.id,
+                docItem.data() as FirestoreMaintenanceRecord,
+                Date.now() + index
+              )
+            )
+            .filter((record) => record.date && record.menu)
+            .sort((a, b) => {
+              const aTime = new Date(a.date).getTime();
+              const bTime = new Date(b.date).getTime();
+              return bTime - aTime;
+            });
+
+          setRecords(firestoreRecords);
+          window.localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(firestoreRecords)
+          );
+          setSavedMessage('Firebaseからメンテ記録を読み込みました');
+          setIsLoaded(true);
+          return;
+        }
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldMaintenanceRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeLocalRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+            setSavedMessage('localStorageからメンテ記録を読み込みました');
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+            setSavedMessage('初期データを読み込みました');
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+          setSavedMessage('初期データを読み込みました');
+        }
+      } catch (error) {
+        console.error('Firestoreからの読み込みに失敗しました:', error);
+
+        const errorMessage =
+          error instanceof Error ? error.message : 'unknown error';
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldMaintenanceRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeLocalRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+            setSavedMessage(
+              `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
+            );
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+            setSavedMessage(
+              `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
+            );
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+          setSavedMessage(
+            `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
+          );
+        }
+      } finally {
+        setIsLoaded(true);
       }
-    } else {
-      setRecords(DEFAULT_RECORDS);
     }
 
-    setIsLoaded(true);
+    loadRecords();
   }, []);
 
   useEffect(() => {
@@ -123,19 +237,21 @@ export default function MaintenancePage() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   }, [records, isLoaded]);
 
-  function handleSave() {
+  async function handleSave() {
     const newErrors: MaintenanceErrors = {};
 
     if (!date) {
-      newErrors.date = 'メンテ日を入れてください';
+      newErrors.date = '実施日を入れてください';
     }
 
     if (!menu) {
       newErrors.menu = 'メニューを選んでください';
     }
 
-    if (price && Number(price) < 0) {
-      newErrors.price = '価格は 0 以上で入力してください';
+    if (!price) {
+      newErrors.price = '価格を入れてください';
+    } else if (Number(price) < 0) {
+      newErrors.price = '0以上の値にしてください';
     }
 
     setErrors(newErrors);
@@ -145,40 +261,91 @@ export default function MaintenancePage() {
       return;
     }
 
-    if (editingId !== null) {
-      const updatedRecords = records.map((record) =>
-        record.id === editingId
-          ? {
-              ...record,
-              date,
-              menu: menu as MaintenanceMenu,
-              price,
-              memo,
-            }
-          : record
+    try {
+      const { db, collection, addDoc, doc, updateDoc } =
+        await getFirebaseModules();
+
+      if (editingId !== null) {
+        const targetRecord = records.find((record) => record.id === editingId);
+
+        if (!targetRecord?.docId) {
+          setSavedMessage('更新対象のFirebaseデータが見つかりませんでした');
+          return;
+        }
+
+        await updateDoc(doc(db, 'maintenanceRecords', targetRecord.docId), {
+          date,
+          menu,
+          price,
+          memo,
+          updatedAt: new Date().toISOString(),
+        });
+
+        const updatedRecords = records
+          .map((record) =>
+            record.id === editingId
+              ? {
+                  ...record,
+                  date,
+                  menu,
+                  price,
+                  memo,
+                }
+              : record
+          )
+          .sort((a, b) => {
+            const aTime = new Date(a.date).getTime();
+            const bTime = new Date(b.date).getTime();
+            return bTime - aTime;
+          });
+
+        setRecords(updatedRecords);
+        setSavedMessage('メンテ記録を更新しました');
+        setEditingId(null);
+      } else {
+        const newRecordBase: MaintenanceRecord = {
+          id: Date.now(),
+          date,
+          menu,
+          price,
+          memo,
+        };
+
+        const docRef = await addDoc(collection(db, 'maintenanceRecords'), {
+          ...newRecordBase,
+          createdAt: new Date().toISOString(),
+        });
+
+        const newRecord: MaintenanceRecord = {
+          ...newRecordBase,
+          docId: docRef.id,
+        };
+
+        setRecords((prev) =>
+          [newRecord, ...prev].sort((a, b) => {
+            const aTime = new Date(a.date).getTime();
+            const bTime = new Date(b.date).getTime();
+            return bTime - aTime;
+          })
+        );
+        setSavedMessage('メンテ記録を保存しました');
+      }
+
+      setDate('');
+      setMenu('インテリア追加');
+      setPrice('');
+      setMemo('');
+      setErrors({});
+    } catch (error) {
+      console.error('Firestoreへの保存に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(
+        `Firebase保存失敗: ${errorMessage} / localStorageへの保存状態を確認してください`
       );
-
-      setRecords(updatedRecords);
-      setSavedMessage('メンテ記録を更新しました');
-      setEditingId(null);
-    } else {
-      const newRecord: MaintenanceRecord = {
-        id: Date.now(),
-        date,
-        menu: menu as MaintenanceMenu,
-        price,
-        memo,
-      };
-
-      setRecords([newRecord, ...records]);
-      setSavedMessage('メンテ記録を保存しました');
     }
-
-    setDate('');
-    setMenu('');
-    setPrice('');
-    setMemo('');
-    setErrors({});
   }
 
   function handleEdit(record: MaintenanceRecord) {
@@ -192,7 +359,7 @@ export default function MaintenancePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleDelete(id: number) {
+  async function handleDelete(id: number) {
     const targetRecord = records.find((record) => record.id === id);
 
     if (!targetRecord) return;
@@ -203,30 +370,46 @@ export default function MaintenancePage() {
 
     if (!ok) return;
 
-    const nextRecords = records.filter((record) => record.id !== id);
-    setRecords(nextRecords);
+    try {
+      if (targetRecord.docId) {
+        const { db, doc, deleteDoc } = await getFirebaseModules();
+        await deleteDoc(doc(db, 'maintenanceRecords', targetRecord.docId));
+      }
 
-    if (editingId === id) {
-      setEditingId(null);
-      setDate('');
-      setMenu('');
-      setPrice('');
-      setMemo('');
-      setErrors({});
+      const nextRecords = records.filter((record) => record.id !== id);
+      setRecords(nextRecords);
+
+      if (editingId === id) {
+        setEditingId(null);
+        setDate('');
+        setMenu('インテリア追加');
+        setPrice('');
+        setMemo('');
+        setErrors({});
+      }
+
+      setSavedMessage('メンテ記録を削除しました');
+    } catch (error) {
+      console.error('Firestoreからの削除に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(`Firebase削除失敗: ${errorMessage}`);
     }
-
-    setSavedMessage('メンテ記録を削除しました');
   }
 
   function handleCancelEdit() {
     setEditingId(null);
     setDate('');
-    setMenu('');
+    setMenu('インテリア追加');
     setPrice('');
     setMemo('');
     setErrors({});
     setSavedMessage('編集をキャンセルしました');
   }
+
+  const totalCost = records.reduce((sum, record) => sum + Number(record.price || 0), 0);
 
   return (
     <main
@@ -258,8 +441,28 @@ export default function MaintenancePage() {
           icon="🔧"
           englishLabel="Maintenance Log"
           title="メンテ記録"
-          description="追加作業・交換作業・費用をまとめて記録"
+          description="インテリア・エクステリア・パーツ交換をまとめて管理"
         />
+
+        <SectionCard>
+          <p
+            style={{
+              margin: '0 0 8px 0',
+              color: '#71717a',
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            Maintenance Summary
+          </p>
+          <p style={{ margin: 0, fontSize: '32px', fontWeight: 700 }}>
+            {totalCost.toLocaleString()}
+            <span style={{ fontSize: '15px', color: '#a1a1aa', marginLeft: '8px' }}>
+              円
+            </span>
+          </p>
+        </SectionCard>
 
         <SectionCard active={editingId !== null}>
           <h2 style={{ fontSize: '20px', margin: '0 0 18px 0' }}>
@@ -268,7 +471,7 @@ export default function MaintenancePage() {
 
           <div style={{ display: 'grid', gap: '16px' }}>
             <DateInputWithPicker
-              label="メンテ日"
+              label="実施日"
               value={date}
               onChange={(value) => {
                 setDate(value);
@@ -282,13 +485,12 @@ export default function MaintenancePage() {
               <select
                 value={menu}
                 onChange={(e) => {
-                  setMenu(e.target.value);
+                  setMenu(e.target.value as MaintenanceMenu);
                   setErrors((prev) => ({ ...prev, menu: undefined }));
                 }}
                 style={inputStyle(!!errors.menu)}
               >
-                <option value="">選んでください</option>
-                {MAINTENANCE_MENU_OPTIONS.map((option) => (
+                {MENU_OPTIONS.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -309,7 +511,7 @@ export default function MaintenancePage() {
             </div>
 
             <div>
-              <label style={labelStyle()}>価格（円）</label>
+              <label style={labelStyle()}>価格 (円)</label>
               <input
                 type="number"
                 value={price}
@@ -317,7 +519,7 @@ export default function MaintenancePage() {
                   setPrice(e.target.value);
                   setErrors((prev) => ({ ...prev, price: undefined }));
                 }}
-                placeholder="例: 3000"
+                placeholder="例: 3500"
                 style={inputStyle(!!errors.price)}
               />
               {errors.price ? (
@@ -340,7 +542,7 @@ export default function MaintenancePage() {
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
                 rows={4}
-                placeholder="例: 追加したもの、交換した内容など"
+                placeholder="例: ワイパーを交換、車内小物を追加"
                 style={{ ...inputStyle(false), resize: 'vertical' }}
               />
             </div>
@@ -440,7 +642,10 @@ export default function MaintenancePage() {
 
                   <p style={{ margin: '0 0 8px 0', color: '#a1a1aa', fontSize: '14px' }}>
                     {record.menu}
-                    {record.price ? ` / ${Number(record.price).toLocaleString()}円` : ''}
+                  </p>
+
+                  <p style={{ margin: '0 0 8px 0', color: '#d4d4d8', fontSize: '14px' }}>
+                    {Number(record.price).toLocaleString()}円
                   </p>
 
                   {record.memo ? (
