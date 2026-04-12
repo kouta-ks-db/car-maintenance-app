@@ -1,15 +1,33 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
 
 type MileageRecord = {
   id: number;
+  docId?: string;
   date: string;
   distance: string;
+  memo: string;
+};
+
+type OldMileageRecord = {
+  id: number;
+  date: string;
+  distance?: string;
+  memo?: string;
+};
+
+type FirestoreMileageRecord = {
+  id?: number;
+  date?: string;
+  distance?: string;
+  memo?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type MileageErrors = {
@@ -24,13 +42,55 @@ const DEFAULT_RECORDS: MileageRecord[] = [
     id: 1,
     date: '2026-04-12',
     distance: '45200',
+    memo: '週末ドライブ後',
   },
   {
     id: 2,
     date: '2026-04-01',
     distance: '44800',
+    memo: '月初の記録',
   },
 ];
+
+function normalizeLocalRecord(record: OldMileageRecord): MileageRecord {
+  return {
+    id: record.id,
+    date: record.date ?? '',
+    distance: record.distance ?? '',
+    memo: record.memo ?? '',
+  };
+}
+
+function normalizeFirestoreRecord(
+  docId: string,
+  record: FirestoreMileageRecord,
+  fallbackId: number
+): MileageRecord {
+  return {
+    id: typeof record.id === 'number' ? record.id : fallbackId,
+    docId,
+    date: record.date ?? '',
+    distance: record.distance ?? '',
+    memo: record.memo ?? '',
+  };
+}
+
+async function getFirebaseModules() {
+  const [{ db }, firestore] = await Promise.all([
+    import('@/lib/firebase'),
+    import('firebase/firestore/lite'),
+  ]);
+
+  return {
+    db,
+    collection: firestore.collection,
+    addDoc: firestore.addDoc,
+    getDocs: firestore.getDocs,
+    doc: firestore.doc,
+    updateDoc: firestore.updateDoc,
+    deleteDoc: firestore.deleteDoc,
+  };
+}
 
 function labelStyle() {
   return {
@@ -57,6 +117,7 @@ function inputStyle(hasError = false) {
 export default function MileagePage() {
   const [date, setDate] = useState('');
   const [distance, setDistance] = useState('');
+  const [memo, setMemo] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [savedMessage, setSavedMessage] = useState('');
   const [errors, setErrors] = useState<MileageErrors>({});
@@ -64,20 +125,91 @@ export default function MileagePage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-
-    if (saved) {
+    async function loadRecords() {
       try {
-        const parsed = JSON.parse(saved) as MileageRecord[];
-        setRecords(Array.isArray(parsed) ? parsed : DEFAULT_RECORDS);
-      } catch {
-        setRecords(DEFAULT_RECORDS);
+        const { db, collection, getDocs } = await getFirebaseModules();
+        const snapshot = await getDocs(collection(db, 'mileageRecords'));
+
+        if (!snapshot.empty) {
+          const firestoreRecords = snapshot.docs
+            .map((docItem, index) =>
+              normalizeFirestoreRecord(
+                docItem.id,
+                docItem.data() as FirestoreMileageRecord,
+                Date.now() + index
+              )
+            )
+            .filter((record) => record.date && record.distance)
+            .sort((a, b) => {
+              const aTime = new Date(b.date).getTime();
+              const bTime = new Date(a.date).getTime();
+              return aTime - bTime;
+            });
+
+          setRecords(firestoreRecords);
+          window.localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(firestoreRecords)
+          );
+          setSavedMessage('Firebaseから走行距離記録を読み込みました');
+          setIsLoaded(true);
+          return;
+        }
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldMileageRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeLocalRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+            setSavedMessage('localStorageから走行距離記録を読み込みました');
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+            setSavedMessage('初期データを読み込みました');
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+          setSavedMessage('初期データを読み込みました');
+        }
+      } catch (error) {
+        console.error('Firestoreからの読み込みに失敗しました:', error);
+
+        const errorMessage =
+          error instanceof Error ? error.message : 'unknown error';
+
+        const savedRecords = window.localStorage.getItem(STORAGE_KEY);
+
+        if (savedRecords) {
+          try {
+            const parsed = JSON.parse(savedRecords) as OldMileageRecord[];
+            const normalized = Array.isArray(parsed)
+              ? parsed.map(normalizeLocalRecord)
+              : DEFAULT_RECORDS;
+            setRecords(normalized);
+            setSavedMessage(
+              `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
+            );
+          } catch {
+            setRecords(DEFAULT_RECORDS);
+            setSavedMessage(
+              `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
+            );
+          }
+        } else {
+          setRecords(DEFAULT_RECORDS);
+          setSavedMessage(
+            `Firebase読み込み失敗: ${errorMessage} / 初期データを表示しています`
+          );
+        }
+      } finally {
+        setIsLoaded(true);
       }
-    } else {
-      setRecords(DEFAULT_RECORDS);
     }
 
-    setIsLoaded(true);
+    loadRecords();
   }, []);
 
   useEffect(() => {
@@ -85,11 +217,11 @@ export default function MileagePage() {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   }, [records, isLoaded]);
 
-  function handleSave() {
+  async function handleSave() {
     const newErrors: MileageErrors = {};
 
     if (!date) {
-      newErrors.date = '日付を入れてください';
+      newErrors.date = '記録日を入れてください';
     }
 
     if (!distance) {
@@ -105,61 +237,145 @@ export default function MileagePage() {
       return;
     }
 
-    if (editingId !== null) {
-      const updated = records.map((record) =>
-        record.id === editingId ? { ...record, date, distance } : record
+    try {
+      const { db, collection, addDoc, doc, updateDoc } =
+        await getFirebaseModules();
+
+      if (editingId !== null) {
+        const targetRecord = records.find((record) => record.id === editingId);
+
+        if (!targetRecord?.docId) {
+          setSavedMessage('更新対象のFirebaseデータが見つかりませんでした');
+          return;
+        }
+
+        await updateDoc(doc(db, 'mileageRecords', targetRecord.docId), {
+          date,
+          distance,
+          memo,
+          updatedAt: new Date().toISOString(),
+        });
+
+        const updatedRecords = records
+          .map((record) =>
+            record.id === editingId
+              ? {
+                  ...record,
+                  date,
+                  distance,
+                  memo,
+                }
+              : record
+          )
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setRecords(updatedRecords);
+        setSavedMessage('走行距離記録を更新しました');
+        setEditingId(null);
+      } else {
+        const newRecordBase: MileageRecord = {
+          id: Date.now(),
+          date,
+          distance,
+          memo,
+        };
+
+        const docRef = await addDoc(collection(db, 'mileageRecords'), {
+          ...newRecordBase,
+          createdAt: new Date().toISOString(),
+        });
+
+        const newRecord: MileageRecord = {
+          ...newRecordBase,
+          docId: docRef.id,
+        };
+
+        setRecords((prev) =>
+          [newRecord, ...prev].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          )
+        );
+        setSavedMessage('走行距離記録を保存しました');
+      }
+
+      setDate('');
+      setDistance('');
+      setMemo('');
+      setErrors({});
+    } catch (error) {
+      console.error('Firestoreへの保存に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(
+        `Firebase保存失敗: ${errorMessage} / localStorageへの保存状態を確認してください`
       );
-      setRecords(updated);
-      setEditingId(null);
-      setSavedMessage('更新しました');
-    } else {
-      const newRecord: MileageRecord = {
-        id: Date.now(),
-        date,
-        distance,
-      };
-
-      setRecords([newRecord, ...records]);
-      setSavedMessage('保存しました');
     }
-
-    setDate('');
-    setDistance('');
-    setErrors({});
   }
 
   function handleEdit(record: MileageRecord) {
     setDate(record.date);
     setDistance(record.distance);
+    setMemo(record.memo);
     setEditingId(record.id);
     setErrors({});
-    setSavedMessage('編集中');
+    setSavedMessage(`編集中: ${record.date} の走行距離記録`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleDelete(id: number) {
-    if (!window.confirm('削除しますか？')) return;
+  async function handleDelete(id: number) {
+    const targetRecord = records.find((record) => record.id === id);
 
-    setRecords(records.filter((record) => record.id !== id));
-    setSavedMessage('削除しました');
+    if (!targetRecord) return;
+
+    const ok = window.confirm(
+      `${targetRecord.date} / ${Number(targetRecord.distance).toLocaleString()}km を削除しますか？`
+    );
+
+    if (!ok) return;
+
+    try {
+      if (targetRecord.docId) {
+        const { db, doc, deleteDoc } = await getFirebaseModules();
+        await deleteDoc(doc(db, 'mileageRecords', targetRecord.docId));
+      }
+
+      const nextRecords = records.filter((record) => record.id !== id);
+      setRecords(nextRecords);
+
+      if (editingId === id) {
+        setEditingId(null);
+        setDate('');
+        setDistance('');
+        setMemo('');
+        setErrors({});
+      }
+
+      setSavedMessage('走行距離記録を削除しました');
+    } catch (error) {
+      console.error('Firestoreからの削除に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(`Firebase削除失敗: ${errorMessage}`);
+    }
   }
 
   function handleCancelEdit() {
     setEditingId(null);
     setDate('');
     setDistance('');
+    setMemo('');
     setErrors({});
     setSavedMessage('編集をキャンセルしました');
   }
 
-  const latest =
-    records.length > 0
-      ? Math.max(...records.map((record) => Number(record.distance)))
-      : 0;
-
-  const sortedRecords = [...records].sort(
-    (a, b) => Number(b.distance || 0) - Number(a.distance || 0)
-  );
+  const latestDistance = useMemo(() => {
+    if (records.length === 0) return null;
+    return Math.max(...records.map((record) => Number(record.distance || 0)));
+  }, [records]);
 
   return (
     <main
@@ -190,8 +406,8 @@ export default function MileagePage() {
         <AppHeaderCard
           icon="📍"
           englishLabel="Mileage Log"
-          title="走行距離"
-          description="日付ごとの走行距離を記録して推移を確認"
+          title="走行距離記録"
+          description="走行距離の履歴をまとめて管理"
         />
 
         <SectionCard>
@@ -204,10 +420,10 @@ export default function MileagePage() {
               letterSpacing: '0.08em',
             }}
           >
-            Current Mileage
+            Mileage Summary
           </p>
           <p style={{ margin: 0, fontSize: '32px', fontWeight: 700 }}>
-            {latest.toLocaleString()}
+            {latestDistance !== null ? latestDistance.toLocaleString() : '-'}
             <span style={{ fontSize: '15px', color: '#a1a1aa', marginLeft: '8px' }}>
               km
             </span>
@@ -216,12 +432,12 @@ export default function MileagePage() {
 
         <SectionCard active={editingId !== null}>
           <h2 style={{ fontSize: '20px', margin: '0 0 18px 0' }}>
-            {editingId !== null ? '走行距離を編集' : '走行距離を入力'}
+            {editingId !== null ? '走行距離記録を編集' : '走行距離を入力'}
           </h2>
 
           <div style={{ display: 'grid', gap: '16px' }}>
             <DateInputWithPicker
-              label="日付"
+              label="記録日"
               value={date}
               onChange={(value) => {
                 setDate(value);
@@ -234,12 +450,12 @@ export default function MileagePage() {
               <label style={labelStyle()}>走行距離 (km)</label>
               <input
                 type="number"
-                placeholder="例: 45200"
                 value={distance}
                 onChange={(e) => {
                   setDistance(e.target.value);
                   setErrors((prev) => ({ ...prev, distance: undefined }));
                 }}
+                placeholder="例: 45200"
                 style={inputStyle(!!errors.distance)}
               />
               {errors.distance ? (
@@ -254,6 +470,17 @@ export default function MileagePage() {
                   {errors.distance}
                 </p>
               ) : null}
+            </div>
+
+            <div>
+              <label style={labelStyle()}>メモ</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={4}
+                placeholder="例: 月初記録、ドライブ後"
+                style={{ ...inputStyle(false), resize: 'vertical' }}
+              />
             </div>
           </div>
 
@@ -272,7 +499,7 @@ export default function MileagePage() {
                 fontSize: '15px',
               }}
             >
-              {editingId ? '更新する' : '保存する'}
+              {editingId !== null ? '更新する' : '保存する'}
             </button>
 
             {editingId !== null ? (
@@ -323,19 +550,19 @@ export default function MileagePage() {
               marginBottom: '14px',
             }}
           >
-            <h2 style={{ fontSize: '20px', margin: 0 }}>走行距離一覧</h2>
+            <h2 style={{ fontSize: '20px', margin: 0 }}>走行距離記録一覧</h2>
             <span style={{ color: '#71717a', fontSize: '13px' }}>
-              {isLoaded ? `${sortedRecords.length} 件` : '読み込み中...'}
+              {isLoaded ? `${records.length} 件` : '読み込み中...'}
             </span>
           </div>
 
           {!isLoaded ? (
             <p style={{ color: '#a1a1aa', margin: 0 }}>読み込み中...</p>
-          ) : sortedRecords.length === 0 ? (
+          ) : records.length === 0 ? (
             <p style={{ color: '#a1a1aa', margin: 0 }}>記録がありません</p>
           ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
-              {sortedRecords.map((record) => (
+              {records.map((record) => (
                 <div
                   key={record.id}
                   style={{
@@ -349,9 +576,15 @@ export default function MileagePage() {
                     {record.date}
                   </p>
 
-                  <p style={{ margin: '0 0 12px 0', color: '#a1a1aa', fontSize: '14px' }}>
+                  <p style={{ margin: '0 0 8px 0', color: '#d4d4d8', fontSize: '14px' }}>
                     {Number(record.distance).toLocaleString()} km
                   </p>
+
+                  {record.memo ? (
+                    <p style={{ margin: '0 0 12px 0', color: '#a1a1aa', fontSize: '14px' }}>
+                      {record.memo}
+                    </p>
+                  ) : null}
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button

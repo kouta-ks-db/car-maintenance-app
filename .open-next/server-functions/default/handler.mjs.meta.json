@@ -3649,7 +3649,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
-      "bytes": 7186,
+      "bytes": 7183,
       "imports": [],
       "format": "cjs"
     },
@@ -4707,6 +4707,11 @@
       ],
       "format": "cjs"
     },
+    ".open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js": {
+      "bytes": 12187,
+      "imports": [],
+      "format": "cjs"
+    },
     ".open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js": {
       "bytes": 119,
       "imports": [],
@@ -4721,11 +4726,6 @@
           "external": true
         }
       ],
-      "format": "cjs"
-    },
-    ".open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js": {
-      "bytes": 8621,
-      "imports": [],
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0bxv.xt._.js": {
@@ -4793,7 +4793,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js": {
-      "bytes": 46758,
+      "bytes": 46752,
       "imports": [
         {
           "path": "worker_threads",
@@ -5031,6 +5031,11 @@
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0vg6e4k._.js"
         },
         {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js",
+          "kind": "require-call",
+          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js"
+        },
+        {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js",
           "kind": "require-call",
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js"
@@ -5039,11 +5044,6 @@
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/node_modules_next_dist_esm_build_templates_app-page_0wygmte.js",
           "kind": "require-call",
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/node_modules_next_dist_esm_build_templates_app-page_0wygmte.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js",
-          "kind": "require-call",
-          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0bxv.xt._.js",
@@ -5094,7 +5094,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/[turbopack]_runtime.js": {
-      "bytes": 46748,
+      "bytes": 46742,
       "imports": [
         {
           "path": "worker_threads",
@@ -5332,6 +5332,11 @@
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0vg6e4k._.js"
         },
         {
+          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js",
+          "kind": "require-call",
+          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js"
+        },
+        {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js",
           "kind": "require-call",
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js"
@@ -5340,11 +5345,6 @@
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/node_modules_next_dist_esm_build_templates_app-page_0wygmte.js",
           "kind": "require-call",
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/node_modules_next_dist_esm_build_templates_app-page_0wygmte.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js",
-          "kind": "require-call",
-          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0bxv.xt._.js",
@@ -8072,7 +8072,7 @@
           "bytesInOutput": 5955
         },
         ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
-          "bytesInOutput": 6875
+          "bytesInOutput": 6872
         },
         ".open-next/server-functions/default/.next/server/app/wash/page_client-reference-manifest.js": {
           "bytesInOutput": 6854
@@ -8272,14 +8272,14 @@
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0vg6e4k._.js": {
           "bytesInOutput": 1708
         },
+        ".open-next/server-functions/default/.next/server/chunks/ssr/_0cd0oqh._.js": {
+          "bytesInOutput": 13873
+        },
         ".open-next/server-functions/default/.next/server/chunks/ssr/_next-internal_server_app_mileage_page_actions_0vz0_b-.js": {
           "bytesInOutput": 264
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/node_modules_next_dist_esm_build_templates_app-page_0wygmte.js": {
           "bytesInOutput": 23256
-        },
-        ".open-next/server-functions/default/.next/server/chunks/ssr/src_0rrzzp8._.js": {
-          "bytesInOutput": 9429
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[root-of-the-server]__0bxv.xt._.js": {
           "bytesInOutput": 1676
@@ -8306,10 +8306,10 @@
           "bytesInOutput": 23245
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js": {
-          "bytesInOutput": 23664
+          "bytesInOutput": 23656
         },
         ".open-next/server-functions/default/.next/server/chunks/[turbopack]_runtime.js": {
-          "bytesInOutput": 23616
+          "bytesInOutput": 23608
         },
         ".open-next/server-functions/default/.next/server/app/manifest.webmanifest/route.js": {
           "bytesInOutput": 533
@@ -8492,7 +8492,7 @@
           "bytesInOutput": 60997
         }
       },
-      "bytes": 5022285
+      "bytes": 5026710
     }
   }
 }
