@@ -2,13 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  orderBy,
-  query,
-} from 'firebase/firestore';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
@@ -51,7 +45,8 @@ type FirestoreWashRecord = {
   image?: string | null;
   products?: string;
   createdAt?: string;
-  mode?: string;
+  mode?: 'create' | 'edit';
+  originalId?: number;
 };
 
 type WashErrors = {
@@ -104,12 +99,9 @@ function normalizeRecord(record: OldWashRecord): WashRecord {
   };
 }
 
-function normalizeFirestoreRecord(
-  docId: string,
-  record: FirestoreWashRecord
-): WashRecord {
+function normalizeFirestoreRecord(record: FirestoreWashRecord, fallbackId: number): WashRecord {
   return {
-    id: typeof record.id === 'number' ? record.id : Number(docId.replace(/\D/g, '').slice(0, 12)) || Date.now(),
+    id: typeof record.id === 'number' ? record.id : fallbackId,
     date: record.date ?? '',
     menus: Array.isArray(record.menus) ? record.menus : [],
     memo: record.memo ?? '',
@@ -155,27 +147,33 @@ export default function WashPage() {
   useEffect(() => {
     async function loadRecords() {
       try {
-        const q = query(
-          collection(db, 'washRecords'),
-          orderBy('createdAt', 'desc')
-        );
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocs(collection(db, 'washRecords'));
 
         if (!snapshot.empty) {
-          const firestoreRecords = snapshot.docs
-            .map((doc) =>
-              normalizeFirestoreRecord(
-                doc.id,
-                doc.data() as FirestoreWashRecord
-              )
-            )
-            .filter((record) => record.date && record.menus.length > 0);
+          const firestoreDocs = snapshot.docs.map((doc, index) => {
+            const data = doc.data() as FirestoreWashRecord;
+            return {
+              docId: doc.id,
+              data,
+              fallbackId: Date.now() + index,
+            };
+          });
+
+          // create のみを一覧用に採用
+          const createdOnly = firestoreDocs.filter((item) => item.data.mode !== 'edit');
+
+          const firestoreRecords = createdOnly
+            .map((item) => normalizeFirestoreRecord(item.data, item.fallbackId))
+            .filter((record) => record.date && record.menus.length > 0)
+            .sort((a, b) => {
+              const aTime = new Date(a.date).getTime();
+              const bTime = new Date(b.date).getTime();
+              return bTime - aTime;
+            });
 
           setRecords(firestoreRecords);
-          window.localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify(firestoreRecords)
-          );
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(firestoreRecords));
+          setSavedMessage('Firebaseから洗車記録を読み込みました');
           setIsLoaded(true);
           return;
         }
@@ -189,11 +187,14 @@ export default function WashPage() {
               ? parsed.map(normalizeRecord)
               : DEFAULT_RECORDS;
             setRecords(normalized);
+            setSavedMessage('localStorageから洗車記録を読み込みました');
           } catch {
             setRecords(DEFAULT_RECORDS);
+            setSavedMessage('初期データを読み込みました');
           }
         } else {
           setRecords(DEFAULT_RECORDS);
+          setSavedMessage('初期データを読み込みました');
         }
       } catch (error) {
         console.error('Firestoreからの読み込みに失敗しました:', error);
@@ -207,11 +208,14 @@ export default function WashPage() {
               ? parsed.map(normalizeRecord)
               : DEFAULT_RECORDS;
             setRecords(normalized);
+            setSavedMessage('Firebase読み込み失敗のためlocalStorageを表示しています');
           } catch {
             setRecords(DEFAULT_RECORDS);
+            setSavedMessage('Firebase読み込み失敗のため初期データを表示しています');
           }
         } else {
           setRecords(DEFAULT_RECORDS);
+          setSavedMessage('Firebase読み込み失敗のため初期データを表示しています');
         }
       } finally {
         setIsLoaded(true);
