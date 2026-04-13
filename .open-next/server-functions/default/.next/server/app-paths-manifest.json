@@ -1,6 +1,7 @@
 {
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/weather/route": "app/api/weather/route.js",
   "/dilution/page": "app/dilution/page.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
   "/fuel/page": "app/fuel/page.js",
@@ -9,5 +10,6 @@
   "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
   "/mileage/page": "app/mileage/page.js",
   "/page": "app/page.js",
-  "/wash/page": "app/wash/page.js"
+  "/wash/page": "app/wash/page.js",
+  "/weather/page": "app/weather/page.js"
 }

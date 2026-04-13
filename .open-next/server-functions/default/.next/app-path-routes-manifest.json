@@ -1,6 +1,7 @@
 {
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
+  "/api/weather/route": "/api/weather",
   "/dilution/page": "/dilution",
   "/favicon.ico/route": "/favicon.ico",
   "/fuel/page": "/fuel",
@@ -9,5 +10,6 @@
   "/manifest.webmanifest/route": "/manifest.webmanifest",
   "/mileage/page": "/mileage",
   "/page": "/",
-  "/wash/page": "/wash"
+  "/wash/page": "/wash",
+  "/weather/page": "/weather"
 }

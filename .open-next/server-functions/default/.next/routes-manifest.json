@@ -42,6 +42,12 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/api/weather",
+      "regex": "^/api/weather(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/weather(?:/)?$"
+    },
+    {
       "page": "/dilution",
       "regex": "^/dilution(?:/)?$",
       "routeKeys": {},
@@ -88,6 +94,12 @@
       "regex": "^/wash(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/wash(?:/)?$"
+    },
+    {
+      "page": "/weather",
+      "regex": "^/weather(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/weather(?:/)?$"
     }
   ],
   "dataRoutes": [],

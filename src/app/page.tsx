@@ -969,6 +969,74 @@ export default function HomePage() {
               走行履歴・現在距離
             </p>
           </Link>
+
+          <Link
+            href="/weather"
+            style={{
+              ...cardStyle(),
+              textDecoration: 'none',
+              color: '#fafafa',
+              display: 'block',
+              padding: '18px',
+            }}
+          >
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#18181b',
+                border: '1px solid #27272a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                marginBottom: '14px',
+              }}
+            >
+              ☀️
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0' }}>
+              天気ガイド
+            </p>
+            <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+              2週間天気・風・黄砂・洗車おすすめ度
+            </p>
+          </Link>
+
+          <Link
+            href="/dilution"
+            style={{
+              ...cardStyle(),
+              textDecoration: 'none',
+              color: '#fafafa',
+              display: 'block',
+              padding: '18px',
+            }}
+          >
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#18181b',
+                border: '1px solid #27272a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                marginBottom: '14px',
+              }}
+            >
+              🧪
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0' }}>
+              希釈計算機
+            </p>
+            <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+              洗剤やケミカルの希釈量をすぐ計算
+            </p>
+          </Link>
         </div>
       </div>
     </main>
