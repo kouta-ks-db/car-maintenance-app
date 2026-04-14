@@ -82,6 +82,59 @@ type FirestoreMileageRecord = {
   memo?: string;
 };
 
+type DailyWeather = {
+  date: string;
+  weatherCode: number;
+  tempMax: number;
+  tempMin: number;
+  precipitationProbabilityMax: number;
+  windSpeedMax: number;
+};
+
+type AirDay = {
+  date: string;
+  dustMax: number | null;
+};
+
+type RecommendationLevel = 'great' | 'good' | 'caution' | 'bad';
+
+type WashRecommendation = {
+  label: string;
+  reason: string;
+  level: RecommendationLevel;
+};
+
+type FavoriteLocation = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
+type SelectedLocationState =
+  | 'current'
+  | {
+      mode: 'favorite';
+      id: string;
+    };
+
+type WeatherDashboardState = {
+  locationLabel: string;
+  today: (DailyWeather & {
+    dustMax: number | null;
+    recommendation: WashRecommendation;
+  }) | null;
+  bestDay: (DailyWeather & {
+    dustMax: number | null;
+    recommendation: WashRecommendation;
+  }) | null;
+  loading: boolean;
+  error: string;
+};
+
+const FAVORITES_STORAGE_KEY = 'weather-favorite-locations';
+const SELECTED_LOCATION_KEY = 'weather-selected-location';
+
 const DEFAULT_FUEL_RECORDS: FuelRecord[] = [
   { id: 1, date: '2026-04-12', odometer: '45200', liters: '24.5', price: '4200' },
   { id: 2, date: '2026-03-30', odometer: '44800', liters: '26.1', price: '4520' },
@@ -241,12 +294,226 @@ function accentLineStyle() {
   } as const;
 }
 
+function getWeatherLabel(code: number) {
+  if (code === 0) return '快晴';
+  if ([1].includes(code)) return '晴れ';
+  if ([2].includes(code)) return '晴れ時々くもり';
+  if ([3].includes(code)) return 'くもり';
+  if ([45, 48].includes(code)) return '霧';
+  if ([51, 53, 55, 56, 57].includes(code)) return '霧雨';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return '雨';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return '雪';
+  if ([95, 96, 99].includes(code)) return '雷雨';
+  return '天気不明';
+}
+
+function getWeatherIcon(code: number) {
+  if (code === 0) return '☀️';
+  if ([1].includes(code)) return '🌤️';
+  if ([2].includes(code)) return '⛅';
+  if ([3].includes(code)) return '☁️';
+  if ([45, 48].includes(code)) return '🌫️';
+  if ([51, 53, 55, 56, 57].includes(code)) return '🌦️';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return '🌧️';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return '❄️';
+  if ([95, 96, 99].includes(code)) return '⛈️';
+  return '❓';
+}
+
+function getWashRecommendation(day: DailyWeather, dustMax: number | null): WashRecommendation {
+  const rain = day.precipitationProbabilityMax ?? 0;
+  const wind = day.windSpeedMax ?? 0;
+  const dust = dustMax ?? 0;
+
+  if (rain >= 60 || wind >= 10 || dust >= 80) {
+    return {
+      label: '× 見送り推奨',
+      reason: '雨・強風・粉じんのいずれかが強め',
+      level: 'bad',
+    };
+  }
+
+  if (rain >= 40 || wind >= 7 || dust >= 40) {
+    return {
+      label: '△ 条件つき',
+      reason: '少し様子見したい条件',
+      level: 'caution',
+    };
+  }
+
+  if (rain <= 20 && wind <= 4 && dust < 20) {
+    return {
+      label: '◎ かなりおすすめ',
+      reason: '乾きやすく、汚れ戻りもしにくい',
+      level: 'great',
+    };
+  }
+
+  return {
+    label: '○ おすすめ',
+    reason: '大きな問題はなさそう',
+    level: 'good',
+  };
+}
+
+function getRecommendationStyle(level: RecommendationLevel) {
+  if (level === 'great') {
+    return {
+      text: '#bfdbfe',
+      border: '#1d4ed8',
+      background: '#172554',
+    };
+  }
+
+  if (level === 'good') {
+    return {
+      text: '#f4f4f5',
+      border: '#3f3f46',
+      background: '#18181b',
+    };
+  }
+
+  if (level === 'caution') {
+    return {
+      text: '#fde68a',
+      border: '#a16207',
+      background: '#422006',
+    };
+  }
+
+  return {
+    text: '#fecaca',
+    border: '#991b1b',
+    background: '#450a0a',
+  };
+}
+
+function getRecommendationScore(day: DailyWeather, dustMax: number | null) {
+  const rain = day.precipitationProbabilityMax ?? 0;
+  const wind = day.windSpeedMax ?? 0;
+  const dust = dustMax ?? 0;
+
+  let score = 100;
+  score -= rain * 0.8;
+  score -= wind * 5;
+  score -= dust * 0.4;
+
+  return score;
+}
+
+function loadFavorites(): FavoriteLocation[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as FavoriteLocation[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadSelectedLocation(): SelectedLocationState {
+  if (typeof window === 'undefined') return 'current';
+
+  try {
+    const raw = window.localStorage.getItem(SELECTED_LOCATION_KEY);
+    if (!raw || raw === 'current') return 'current';
+
+    const parsed = JSON.parse(raw) as { mode?: string; id?: string };
+
+    if (parsed?.mode === 'favorite' && typeof parsed.id === 'string') {
+      return {
+        mode: 'favorite',
+        id: parsed.id,
+      };
+    }
+
+    return 'current';
+  } catch {
+    return 'current';
+  }
+}
+
+async function fetchWeatherByCoords(latitude: number, longitude: number): Promise<{
+  locationLabel: string;
+  weatherDays: DailyWeather[];
+  dustDays: AirDay[];
+}> {
+  const res = await fetch(
+    `/api/weather?latitude=${latitude}&longitude=${longitude}`,
+    { cache: 'no-store' }
+  );
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    throw new Error(json?.error ?? '天気情報の取得に失敗しました');
+  }
+
+  const weatherJson = json.weather;
+  const airJson = json.air;
+  const locationLabel = json.locationLabel ?? '現在地';
+
+  const weatherDays: DailyWeather[] = (weatherJson.daily.time as string[]).map(
+    (date: string, index: number) => ({
+      date,
+      weatherCode: weatherJson.daily.weather_code[index],
+      tempMax: weatherJson.daily.temperature_2m_max[index],
+      tempMin: weatherJson.daily.temperature_2m_min[index],
+      precipitationProbabilityMax:
+        weatherJson.daily.precipitation_probability_max[index],
+      windSpeedMax: weatherJson.daily.wind_speed_10m_max[index],
+    })
+  );
+
+  const dustByDay = new Map<string, number | null>();
+  const hourlyTimes: string[] = airJson?.hourly?.time ?? [];
+  const hourlyDust: (number | null)[] = airJson?.hourly?.dust ?? [];
+
+  hourlyTimes.forEach((time, index) => {
+    const day = time.slice(0, 10);
+    const dust = hourlyDust[index];
+
+    if (dust == null) {
+      if (!dustByDay.has(day)) {
+        dustByDay.set(day, null);
+      }
+      return;
+    }
+
+    const current = dustByDay.get(day);
+    if (current == null || dust > current) {
+      dustByDay.set(day, dust);
+    }
+  });
+
+  const dustDays: AirDay[] = weatherDays.map((day) => ({
+    date: day.date,
+    dustMax: dustByDay.get(day.date) ?? null,
+  }));
+
+  return {
+    locationLabel,
+    weatherDays,
+    dustDays,
+  };
+}
+
 export default function HomePage() {
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [washRecords, setWashRecords] = useState<WashRecord[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
   const [mileageRecords, setMileageRecords] = useState<MileageRecord[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [weatherDashboard, setWeatherDashboard] = useState<WeatherDashboardState>({
+    locationLabel: '取得中...',
+    today: null,
+    bestDay: null,
+    loading: true,
+    error: '',
+  });
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -342,6 +609,89 @@ export default function HomePage() {
     }
 
     loadDashboardData();
+  }, []);
+
+  useEffect(() => {
+    async function loadWeatherDashboard() {
+      try {
+        const selected = loadSelectedLocation();
+
+        let result: Awaited<ReturnType<typeof fetchWeatherByCoords>> | null = null;
+        let displayLabel = '現在地';
+
+        if (selected !== 'current') {
+          const favorites = loadFavorites();
+          const favorite = favorites.find((item) => item.id === selected.id);
+
+          if (favorite) {
+            result = await fetchWeatherByCoords(favorite.latitude, favorite.longitude);
+            displayLabel = favorite.label || result.locationLabel;
+          }
+        }
+
+        if (!result) {
+          if (!navigator.geolocation) {
+            throw new Error('位置情報が使えません');
+          }
+
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 1000 * 60 * 10,
+            });
+          });
+
+          const { latitude, longitude } = position.coords;
+          result = await fetchWeatherByCoords(latitude, longitude);
+          displayLabel = result.locationLabel;
+        }
+
+        const mergedDays = result.weatherDays.map((day) => {
+          const dust = result!.dustDays.find((item) => item.date === day.date)?.dustMax ?? null;
+          const recommendation = getWashRecommendation(day, dust);
+
+          return {
+            ...day,
+            dustMax: dust,
+            recommendation,
+          };
+        });
+
+        const today = mergedDays[0] ?? null;
+        const bestDay =
+          [...mergedDays].sort(
+            (a, b) => getRecommendationScore(b, b.dustMax) - getRecommendationScore(a, a.dustMax)
+          )[0] ?? null;
+
+        setWeatherDashboard({
+          locationLabel: displayLabel,
+          today,
+          bestDay,
+          loading: false,
+          error: '',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
+
+        setWeatherDashboard({
+          locationLabel: '取得失敗',
+          today: null,
+          bestDay: null,
+          loading: false,
+          error: message,
+        });
+      }
+    }
+
+    loadWeatherDashboard();
+
+    const onFocus = () => {
+      loadWeatherDashboard();
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const latestFuel = useMemo(() => getLatestByDate(fuelRecords), [fuelRecords]);
@@ -488,6 +838,152 @@ export default function HomePage() {
               給油・洗車・メンテ・走行距離を、ひとつのガレージ画面で管理
             </p>
           </div>
+        </section>
+
+        <section
+          style={{
+            ...cardStyle(),
+            marginBottom: '18px',
+            padding: '20px',
+          }}
+        >
+          <p style={sectionLabelStyle()}>☀️ Wash Weather Dashboard</p>
+          <div style={accentLineStyle()} />
+
+          {weatherDashboard.loading ? (
+            <p style={{ marginTop: '16px', color: '#a1a1aa' }}>天気情報を取得中...</p>
+          ) : weatherDashboard.error ? (
+            <p style={{ marginTop: '16px', color: '#fca5a5' }}>
+              天気取得に失敗しました: {weatherDashboard.error}
+            </p>
+          ) : (
+            <div style={{ marginTop: '16px', display: 'grid', gap: '14px' }}>
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: '18px',
+                  border: '1px solid #27272a',
+                  background: '#09090b',
+                }}
+              >
+                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                  取得地域
+                </p>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>
+                  📍 {weatherDashboard.locationLabel}
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '14px',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '16px',
+                    borderRadius: '18px',
+                    border: `1px solid ${
+                      weatherDashboard.today
+                        ? getRecommendationStyle(weatherDashboard.today.recommendation.level).border
+                        : '#27272a'
+                    }`,
+                    background: weatherDashboard.today
+                      ? getRecommendationStyle(weatherDashboard.today.recommendation.level).background
+                      : '#09090b',
+                  }}
+                >
+                  <p style={{ margin: '0 0 8px 0', color: '#a1a1aa', fontSize: '12px' }}>
+                    今日の洗車おすすめ度
+                  </p>
+
+                  {weatherDashboard.today ? (
+                    <>
+                      <p
+                        style={{
+                          margin: '0 0 8px 0',
+                          fontSize: '26px',
+                          fontWeight: 800,
+                          color: getRecommendationStyle(
+                            weatherDashboard.today.recommendation.level
+                          ).text,
+                        }}
+                      >
+                        {weatherDashboard.today.recommendation.label}
+                      </p>
+                      <p style={{ margin: '0 0 6px 0', color: '#e4e4e7' }}>
+                        {getWeatherIcon(weatherDashboard.today.weatherCode)}{' '}
+                        {getWeatherLabel(weatherDashboard.today.weatherCode)}
+                      </p>
+                      <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+                        {weatherDashboard.today.recommendation.reason}
+                      </p>
+                    </>
+                  ) : (
+                    <p style={{ margin: 0, color: '#a1a1aa' }}>データがありません</p>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    padding: '16px',
+                    borderRadius: '18px',
+                    border: '1px solid #27272a',
+                    background: '#09090b',
+                  }}
+                >
+                  <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                    次の洗車向き日
+                  </p>
+
+                  {weatherDashboard.bestDay ? (
+                    <>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 800 }}>
+                        {weatherDashboard.bestDay.date}
+                      </p>
+                      <p style={{ margin: '0 0 6px 0', color: '#e4e4e7' }}>
+                        {getWeatherIcon(weatherDashboard.bestDay.weatherCode)}{' '}
+                        {getWeatherLabel(weatherDashboard.bestDay.weatherCode)}
+                      </p>
+                      <p
+                        style={{
+                          margin: 0,
+                          color: getRecommendationStyle(
+                            weatherDashboard.bestDay.recommendation.level
+                          ).text,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {weatherDashboard.bestDay.recommendation.label}
+                      </p>
+                    </>
+                  ) : (
+                    <p style={{ margin: 0, color: '#a1a1aa' }}>データがありません</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Link
+                  href="/weather"
+                  style={{
+                    display: 'inline-block',
+                    padding: '12px 16px',
+                    borderRadius: '14px',
+                    textDecoration: 'none',
+                    background: '#fafafa',
+                    color: '#09090b',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                  }}
+                >
+                  天気ガイドを見る
+                </Link>
+              </div>
+            </div>
+          )}
         </section>
 
         <section
