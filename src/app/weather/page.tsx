@@ -27,6 +27,15 @@ type WashRecommendation = {
   level: RecommendationLevel;
 };
 
+type FavoriteLocation = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
+type LocationMode = 'current' | 'favorite';
+
 type WeatherPageState = {
   locationLabel: string;
   weatherDays: DailyWeather[];
@@ -34,6 +43,8 @@ type WeatherPageState = {
   error: string;
   loading: boolean;
 };
+
+const FAVORITES_STORAGE_KEY = 'weather-favorite-locations';
 
 function getWeatherLabel(code: number) {
   if (code === 0) return '快晴';
@@ -175,18 +186,159 @@ function cardStyle() {
   } as const;
 }
 
+function inputStyle() {
+  return {
+    width: '100%',
+    padding: '14px',
+    borderRadius: '14px',
+    border: '1px solid #3f3f46',
+    background: '#09090b',
+    color: '#fafafa',
+    outline: 'none',
+    fontSize: '15px',
+  } as const;
+}
+
+function loadFavorites(): FavoriteLocation[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as FavoriteLocation[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavorites(favorites: FavoriteLocation[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+}
+
+async function fetchWeatherByCoords(latitude: number, longitude: number): Promise<{
+  locationLabel: string;
+  weatherDays: DailyWeather[];
+  dustDays: AirDay[];
+}> {
+  const res = await fetch(
+    `/api/weather?latitude=${latitude}&longitude=${longitude}`,
+    { cache: 'no-store' }
+  );
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    throw new Error(json?.error ?? '天気情報の取得に失敗しました');
+  }
+
+  const weatherJson = json.weather;
+  const airJson = json.air;
+  const locationLabel = json.locationLabel ?? '現在地';
+
+  const weatherDays: DailyWeather[] = (weatherJson.daily.time as string[]).map(
+    (date: string, index: number) => ({
+      date,
+      weatherCode: weatherJson.daily.weather_code[index],
+      tempMax: weatherJson.daily.temperature_2m_max[index],
+      tempMin: weatherJson.daily.temperature_2m_min[index],
+      precipitationProbabilityMax:
+        weatherJson.daily.precipitation_probability_max[index],
+      windSpeedMax: weatherJson.daily.wind_speed_10m_max[index],
+    })
+  );
+
+  const dustByDay = new Map<string, number | null>();
+  const hourlyTimes: string[] = airJson?.hourly?.time ?? [];
+  const hourlyDust: (number | null)[] = airJson?.hourly?.dust ?? [];
+
+  hourlyTimes.forEach((time, index) => {
+    const day = time.slice(0, 10);
+    const dust = hourlyDust[index];
+
+    if (dust == null) {
+      if (!dustByDay.has(day)) {
+        dustByDay.set(day, null);
+      }
+      return;
+    }
+
+    const current = dustByDay.get(day);
+    if (current == null || dust > current) {
+      dustByDay.set(day, dust);
+    }
+  });
+
+  const dustDays: AirDay[] = weatherDays.map((day) => ({
+    date: day.date,
+    dustMax: dustByDay.get(day.date) ?? null,
+  }));
+
+  return {
+    locationLabel,
+    weatherDays,
+    dustDays,
+  };
+}
+
 export default function WeatherPage() {
   const [state, setState] = useState<WeatherPageState>({
-    locationLabel: '現在地',
+    locationLabel: '取得中...',
     weatherDays: [],
     dustDays: [],
     error: '',
     loading: true,
   });
 
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+  const [locationMode, setLocationMode] = useState<LocationMode>('current');
+  const [selectedFavoriteId, setSelectedFavoriteId] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [newLatitude, setNewLatitude] = useState('');
+  const [newLongitude, setNewLongitude] = useState('');
+  const [favoriteMessage, setFavoriteMessage] = useState('');
+
+  useEffect(() => {
+    const saved = loadFavorites();
+    setFavorites(saved);
+    if (saved.length > 0) {
+      setSelectedFavoriteId(saved[0].id);
+    }
+  }, []);
+
   useEffect(() => {
     async function loadWeather() {
       try {
+        setState((prev) => ({
+          ...prev,
+          loading: true,
+          error: '',
+        }));
+
+        if (locationMode === 'favorite' && selectedFavoriteId) {
+          const favorite = favorites.find((item) => item.id === selectedFavoriteId);
+
+          if (!favorite) {
+            throw new Error('お気に入り地点が見つかりません');
+          }
+
+          const result = await fetchWeatherByCoords(
+            favorite.latitude,
+            favorite.longitude
+          );
+
+          setState({
+            locationLabel: favorite.label || result.locationLabel,
+            weatherDays: result.weatherDays,
+            dustDays: result.dustDays,
+            error: '',
+            loading: false,
+          });
+
+          return;
+        }
+
         if (!navigator.geolocation) {
           throw new Error('位置情報が使えません');
         }
@@ -201,63 +353,12 @@ export default function WeatherPage() {
 
         const { latitude, longitude } = position.coords;
 
-        const res = await fetch(
-          `/api/weather?latitude=${latitude}&longitude=${longitude}`,
-          { cache: 'no-store' }
-        );
-
-        const json = await res.json();
-
-        if (!res.ok) {
-          throw new Error(json?.error ?? '天気情報の取得に失敗しました');
-        }
-
-        const weatherJson = json.weather;
-        const airJson = json.air;
-        const locationLabel = json.locationLabel ?? '現在地';
-
-        const weatherDays: DailyWeather[] = (weatherJson.daily.time as string[]).map(
-          (date: string, index: number) => ({
-            date,
-            weatherCode: weatherJson.daily.weather_code[index],
-            tempMax: weatherJson.daily.temperature_2m_max[index],
-            tempMin: weatherJson.daily.temperature_2m_min[index],
-            precipitationProbabilityMax:
-              weatherJson.daily.precipitation_probability_max[index],
-            windSpeedMax: weatherJson.daily.wind_speed_10m_max[index],
-          })
-        );
-
-        const dustByDay = new Map<string, number | null>();
-        const hourlyTimes: string[] = airJson?.hourly?.time ?? [];
-        const hourlyDust: (number | null)[] = airJson?.hourly?.dust ?? [];
-
-        hourlyTimes.forEach((time, index) => {
-          const day = time.slice(0, 10);
-          const dust = hourlyDust[index];
-
-          if (dust == null) {
-            if (!dustByDay.has(day)) {
-              dustByDay.set(day, null);
-            }
-            return;
-          }
-
-          const current = dustByDay.get(day);
-          if (current == null || dust > current) {
-            dustByDay.set(day, dust);
-          }
-        });
-
-        const dustDays: AirDay[] = weatherDays.map((day) => ({
-          date: day.date,
-          dustMax: dustByDay.get(day.date) ?? null,
-        }));
+        const result = await fetchWeatherByCoords(latitude, longitude);
 
         setState({
-          locationLabel,
-          weatherDays,
-          dustDays,
+          locationLabel: result.locationLabel,
+          weatherDays: result.weatherDays,
+          dustDays: result.dustDays,
           error: '',
           loading: false,
         });
@@ -272,7 +373,7 @@ export default function WeatherPage() {
     }
 
     loadWeather();
-  }, []);
+  }, [locationMode, selectedFavoriteId, favorites]);
 
   const today = useMemo(() => {
     if (!state.weatherDays.length) return null;
@@ -286,6 +387,60 @@ export default function WeatherPage() {
       recommendation,
     };
   }, [state.weatherDays, state.dustDays]);
+
+  function handleSaveFavorite() {
+    const label = newLabel.trim();
+    const latitude = Number(newLatitude);
+    const longitude = Number(newLongitude);
+
+    if (!label) {
+      setFavoriteMessage('地点名を入れてください');
+      return;
+    }
+
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      setFavoriteMessage('緯度・経度を正しく入れてください');
+      return;
+    }
+
+    const next: FavoriteLocation[] = [
+      {
+        id: String(Date.now()),
+        label,
+        latitude,
+        longitude,
+      },
+      ...favorites,
+    ];
+
+    setFavorites(next);
+    saveFavorites(next);
+    setSelectedFavoriteId(next[0].id);
+    setLocationMode('favorite');
+    setNewLabel('');
+    setNewLatitude('');
+    setNewLongitude('');
+    setFavoriteMessage('お気に入り地点を保存しました');
+  }
+
+  function handleDeleteFavorite(id: string) {
+    const target = favorites.find((item) => item.id === id);
+    if (!target) return;
+
+    const ok = window.confirm(`${target.label} を削除しますか？`);
+    if (!ok) return;
+
+    const next = favorites.filter((item) => item.id !== id);
+    setFavorites(next);
+    saveFavorites(next);
+
+    if (selectedFavoriteId === id) {
+      setSelectedFavoriteId(next[0]?.id ?? '');
+      setLocationMode(next.length > 0 ? 'favorite' : 'current');
+    }
+
+    setFavoriteMessage('お気に入り地点を削除しました');
+  }
 
   return (
     <main
@@ -317,18 +472,159 @@ export default function WeatherPage() {
           icon="☀️"
           englishLabel="Weather & Wash Guide"
           title="天気・洗車ガイド"
-          description="2週間の天気、風、黄砂の参考値、洗車おすすめ度をまとめて表示"
+          description="現在地とお気に入り地点を切り替えて、天気と洗車おすすめ度を確認"
         />
 
         <SectionCard>
-          <p style={sectionLabelStyle()}>Location</p>
+          <p style={sectionLabelStyle()}>Location Switch</p>
           <div style={accentLineStyle()} />
-          <p style={{ margin: '16px 0 0 0', fontSize: '20px', fontWeight: 700 }}>
-            {state.locationLabel}
-          </p>
-          <p style={{ margin: '8px 0 0 0', color: '#a1a1aa' }}>
-            花粉は第2版で別API連携対応予定
-          </p>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+            <button
+              onClick={() => setLocationMode('current')}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border:
+                  locationMode === 'current'
+                    ? '1px solid #60a5fa'
+                    : '1px solid #3f3f46',
+                background: locationMode === 'current' ? '#172554' : '#09090b',
+                color: locationMode === 'current' ? '#eff6ff' : '#fafafa',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '14px',
+              }}
+            >
+              現在地
+            </button>
+
+            {favorites.map((favorite) => {
+              const active =
+                locationMode === 'favorite' && selectedFavoriteId === favorite.id;
+
+              return (
+                <div
+                  key={favorite.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedFavoriteId(favorite.id);
+                      setLocationMode('favorite');
+                    }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: active ? '1px solid #60a5fa' : '1px solid #3f3f46',
+                      background: active ? '#172554' : '#09090b',
+                      color: active ? '#eff6ff' : '#fafafa',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                    }}
+                  >
+                    {favorite.label}
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteFavorite(favorite.id)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: '1px solid #7f1d1d',
+                      background: '#450a0a',
+                      color: '#fecaca',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'grid', gap: '12px' }}>
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="地点名 例: 自宅 / 洗車場 / 会社"
+              style={inputStyle()}
+            />
+            <input
+              value={newLatitude}
+              onChange={(e) => setNewLatitude(e.target.value)}
+              placeholder="緯度 例: 38.3193"
+              style={inputStyle()}
+            />
+            <input
+              value={newLongitude}
+              onChange={(e) => setNewLongitude(e.target.value)}
+              placeholder="経度 例: 140.8811"
+              style={inputStyle()}
+            />
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleSaveFavorite}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: '#fafafa',
+                  color: '#09090b',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                お気に入り地点を追加
+              </button>
+            </div>
+
+            <p style={{ margin: 0, color: '#a1a1aa', fontSize: '13px' }}>
+              例: 仙台市泉区付近なら 緯度 38.3193 / 経度 140.8811 あたり
+            </p>
+
+            {favoriteMessage ? (
+              <p style={{ margin: 0, color: '#d4d4d8', fontSize: '14px' }}>
+                {favoriteMessage}
+              </p>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <p style={sectionLabelStyle()}>Target Area</p>
+          <div style={accentLineStyle()} />
+
+          {state.loading ? (
+            <p style={{ margin: '16px 0 0 0', color: '#a1a1aa' }}>
+              取得地域を確認中...
+            </p>
+          ) : state.error ? (
+            <p style={{ margin: '16px 0 0 0', color: '#fca5a5' }}>
+              取得地域の表示に失敗しました
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: '16px 0 0 0', fontSize: '20px', fontWeight: 700 }}>
+                取得地域: {state.locationLabel}
+              </p>
+              <p style={{ margin: '8px 0 0 0', color: '#a1a1aa' }}>
+                {locationMode === 'current'
+                  ? '現在地ベースで天気情報を取得しています'
+                  : 'お気に入り地点ベースで天気情報を取得しています'}
+              </p>
+            </>
+          )}
         </SectionCard>
 
         <SectionCard>

@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+function buildLocationLabel(first: any) {
+  if (!first) return '現在地';
+
+  const rawParts = [first.name, first.admin2, first.admin1]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+
+  const uniqueParts: string[] = [];
+
+  for (const part of rawParts) {
+    if (!uniqueParts.includes(part)) {
+      uniqueParts.push(part);
+    }
+  }
+
+  if (uniqueParts.length === 0) {
+    return '現在地';
+  }
+
+  if (uniqueParts.length >= 2) {
+    return uniqueParts.slice(0, 2).join(' ');
+  }
+
+  return uniqueParts[0];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -55,11 +81,7 @@ export async function GET(request: NextRequest) {
     if (geoRes.ok) {
       const geoJson = await geoRes.json();
       const first = geoJson?.results?.[0];
-
-      if (first) {
-        locationLabel =
-          [first.name, first.admin1].filter(Boolean).join(' / ') || '現在地';
-      }
+      locationLabel = buildLocationLabel(first);
     }
 
     return NextResponse.json({

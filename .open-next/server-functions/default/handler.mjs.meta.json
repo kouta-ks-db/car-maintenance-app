@@ -3658,13 +3658,13 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
-      "bytes": 7183,
+    ".open-next/server-functions/default/.next/server/app/weather/page_client-reference-manifest.js": {
+      "bytes": 7185,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/weather/page_client-reference-manifest.js": {
-      "bytes": 7185,
+    ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
+      "bytes": 7183,
       "imports": [],
       "format": "cjs"
     },
@@ -3737,14 +3737,14 @@
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/app/dilution/page_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/weather/page_client-reference-manifest.js",
           "kind": "require-call",
           "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/app/weather/page_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "/Users/kotasato/car-maintenance-app/.open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/wash/page_client-reference-manifest.js",
@@ -4427,7 +4427,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/[root-of-the-server]__0f8izcr._.js": {
-      "bytes": 8701,
+      "bytes": 8882,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/shared/lib/no-fallback-error.external.js",
@@ -4928,7 +4928,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/chunks/ssr/src_0njn1~x._.js": {
-      "bytes": 9923,
+      "bytes": 13925,
       "imports": [],
       "format": "cjs"
     },
@@ -8385,11 +8385,11 @@
         ".open-next/server-functions/default/.next/server/app/dilution/page_client-reference-manifest.js": {
           "bytesInOutput": 6881
         },
-        ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
-          "bytesInOutput": 6872
-        },
         ".open-next/server-functions/default/.next/server/app/weather/page_client-reference-manifest.js": {
           "bytesInOutput": 6874
+        },
+        ".open-next/server-functions/default/.next/server/app/mileage/page_client-reference-manifest.js": {
+          "bytesInOutput": 6872
         },
         ".open-next/server-functions/default/.next/server/app/wash/page_client-reference-manifest.js": {
           "bytesInOutput": 6854
@@ -8524,7 +8524,7 @@
           "bytesInOutput": 22687
         },
         ".open-next/server-functions/default/.next/server/chunks/[root-of-the-server]__0f8izcr._.js": {
-          "bytesInOutput": 8906
+          "bytesInOutput": 9116
         },
         ".open-next/server-functions/default/node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js": {
           "bytesInOutput": 180045
@@ -8653,7 +8653,7 @@
           "bytesInOutput": 23257
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/src_0njn1~x._.js": {
-          "bytesInOutput": 11179
+          "bytesInOutput": 15790
         },
         ".open-next/server-functions/default/.next/server/chunks/ssr/[turbopack]_runtime.js": {
           "bytesInOutput": 24950
@@ -8851,7 +8851,7 @@
           "bytesInOutput": 62116
         }
       },
-      "bytes": 5130446
+      "bytes": 5135267
     }
   }
 }
