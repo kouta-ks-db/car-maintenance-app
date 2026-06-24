@@ -54,6 +54,7 @@ const TEXT_STORAGE_KEY = 'wash-tools-text';
 const DB_NAME = 'car-maintenance-local-db';
 const DB_VERSION = 2;
 const IMAGE_STORE_NAME = 'wash-tool-images';
+const STORAGE_BUCKET = 'car-maintenance-app-f120a.firebasestorage.app';
 
 const CATEGORY_OPTIONS: WashToolCategory[] = [
   'シャンプー',
@@ -69,25 +70,19 @@ const CATEGORY_OPTIONS: WashToolCategory[] = [
 ];
 
 async function getFirebaseModules() {
-  const [{ db, storage }, firestore, storageApi] = await Promise.all([
+  const [{ db }, firestore] = await Promise.all([
     import('@/lib/firebase'),
     import('firebase/firestore/lite'),
-    import('firebase/storage'),
   ]);
 
   return {
     db,
-    storage,
     collection: firestore.collection,
     addDoc: firestore.addDoc,
     getDocs: firestore.getDocs,
     doc: firestore.doc,
     updateDoc: firestore.updateDoc,
     deleteDoc: firestore.deleteDoc,
-    storageRef: storageApi.ref,
-    uploadBytes: storageApi.uploadBytes,
-    getDownloadURL: storageApi.getDownloadURL,
-    deleteObject: storageApi.deleteObject,
   };
 }
 
@@ -195,30 +190,43 @@ function sanitizeFileName(fileName: string) {
 }
 
 async function uploadWashToolImage(docId: string, file: File): Promise<string> {
-  const { storage, storageRef, uploadBytes } = await getFirebaseModules();
   const imagePath = `wash-tools/${docId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-  const fileRef = storageRef(storage, imagePath);
+  const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o?uploadType=media&name=${encodeURIComponent(
+    imagePath
+  )}`;
 
-  await uploadBytes(fileRef, file);
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(`Storage画像アップロード失敗: ${message}`);
+  }
+
   return imagePath;
 }
 
 async function getWashToolImageUrl(imagePath: string): Promise<string | undefined> {
-  try {
-    const { storage, storageRef, getDownloadURL } = await getFirebaseModules();
-    return await getDownloadURL(storageRef(storage, imagePath));
-  } catch (error) {
-    console.error('Storage画像URLの取得に失敗しました:', error);
-    return undefined;
-  }
+  return `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(
+    imagePath
+  )}?alt=media`;
 }
 
 async function deleteWashToolStorageImage(imagePath?: string): Promise<void> {
   if (!imagePath) return;
 
   try {
-    const { storage, storageRef, deleteObject } = await getFirebaseModules();
-    await deleteObject(storageRef(storage, imagePath));
+    await fetch(
+      `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(
+        imagePath
+      )}`,
+      { method: 'DELETE' }
+    );
   } catch (error) {
     console.error('Storage画像の削除に失敗しました:', error);
   }
