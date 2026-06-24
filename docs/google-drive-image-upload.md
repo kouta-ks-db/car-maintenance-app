@@ -34,7 +34,15 @@ For local preview, create `.dev.vars`:
 GOOGLE_DRIVE_IMAGE_UPLOAD_URL="https://script.google.com/macros/s/xxxxx/exec"
 ```
 
-For Cloudflare Workers production:
+For Cloudflare Workers production, create `.env.production.local`:
+
+```txt
+GOOGLE_DRIVE_IMAGE_UPLOAD_URL="https://script.google.com/macros/s/xxxxx/exec"
+```
+
+`.env.production.local` is ignored by Git and is read during the OpenNext build.
+
+Optional: also register it as a Cloudflare secret:
 
 ```sh
 npx wrangler secret put GOOGLE_DRIVE_IMAGE_UPLOAD_URL --config wrangler.jsonc

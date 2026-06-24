@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import process from 'node:process';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 type GoogleDriveUploadResponse = {

@@ -4,6 +4,9 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-04-12",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "GOOGLE_DRIVE_IMAGE_UPLOAD_URL": "https://script.google.com/macros/s/AKfycbzGckhSM37tnUmxStJ3-gsJEs3bDou1fGFJz_SDuY1QOvfwWfrxj40As_QOP6zxGbdkaQ/exec"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
