@@ -27,6 +27,7 @@ type WashTool = {
   purchaseDate: string;
   price: string;
   memo: string;
+  imagePath?: string;
   image?: string;
 };
 
@@ -38,6 +39,7 @@ type FirestoreWashTool = {
   purchaseDate?: string;
   price?: string;
   memo?: string;
+  imagePath?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -67,19 +69,25 @@ const CATEGORY_OPTIONS: WashToolCategory[] = [
 ];
 
 async function getFirebaseModules() {
-  const [{ db }, firestore] = await Promise.all([
+  const [{ db, storage }, firestore, storageApi] = await Promise.all([
     import('@/lib/firebase'),
     import('firebase/firestore/lite'),
+    import('firebase/storage'),
   ]);
 
   return {
     db,
+    storage,
     collection: firestore.collection,
     addDoc: firestore.addDoc,
     getDocs: firestore.getDocs,
     doc: firestore.doc,
     updateDoc: firestore.updateDoc,
     deleteDoc: firestore.deleteDoc,
+    storageRef: storageApi.ref,
+    uploadBytes: storageApi.uploadBytes,
+    getDownloadURL: storageApi.getDownloadURL,
+    deleteObject: storageApi.deleteObject,
   };
 }
 
@@ -182,9 +190,51 @@ async function setWashToolImage(
   });
 }
 
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+async function uploadWashToolImage(docId: string, file: File): Promise<string> {
+  const { storage, storageRef, uploadBytes } = await getFirebaseModules();
+  const imagePath = `wash-tools/${docId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const fileRef = storageRef(storage, imagePath);
+
+  await uploadBytes(fileRef, file);
+  return imagePath;
+}
+
+async function getWashToolImageUrl(imagePath: string): Promise<string | undefined> {
+  try {
+    const { storage, storageRef, getDownloadURL } = await getFirebaseModules();
+    return await getDownloadURL(storageRef(storage, imagePath));
+  } catch (error) {
+    console.error('Storage画像URLの取得に失敗しました:', error);
+    return undefined;
+  }
+}
+
+async function deleteWashToolStorageImage(imagePath?: string): Promise<void> {
+  if (!imagePath) return;
+
+  try {
+    const { storage, storageRef, deleteObject } = await getFirebaseModules();
+    await deleteObject(storageRef(storage, imagePath));
+  } catch (error) {
+    console.error('Storage画像の削除に失敗しました:', error);
+  }
+}
+
 async function hydrateImages(records: WashTool[]): Promise<WashTool[]> {
   return Promise.all(
     records.map(async (record) => {
+      if (record.imagePath) {
+        const cloudImage = await getWashToolImageUrl(record.imagePath);
+
+        if (cloudImage) {
+          return { ...record, image: cloudImage };
+        }
+      }
+
       try {
         const image = await getWashToolImage(getRecordKey(record));
         return { ...record, image };
@@ -209,6 +259,7 @@ function normalizeFirestoreRecord(
     purchaseDate: record.purchaseDate ?? '',
     price: record.price ?? '',
     memo: record.memo ?? '',
+    imagePath: record.imagePath ?? '',
   };
 }
 
@@ -226,6 +277,7 @@ export default function WashToolsPage() {
   const [price, setPrice] = useState('');
   const [memo, setMemo] = useState('');
   const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [savedMessage, setSavedMessage] = useState('');
   const [errors, setErrors] = useState<WashToolErrors>({});
@@ -319,6 +371,7 @@ export default function WashToolsPage() {
     setPrice('');
     setMemo('');
     setImage(null);
+    setImageFile(null);
     setErrors({});
   }
 
@@ -329,6 +382,7 @@ export default function WashToolsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       setImage(reader.result as string);
+      setImageFile(file);
     };
     reader.readAsDataURL(file);
   }
@@ -367,6 +421,17 @@ export default function WashToolsPage() {
           return;
         }
 
+        let nextImagePath = targetTool.imagePath ?? '';
+
+        if (imageFile) {
+          nextImagePath = await uploadWashToolImage(targetTool.docId, imageFile);
+          await deleteWashToolStorageImage(targetTool.imagePath);
+          await setWashToolImage(targetTool.docId, null);
+        } else if (!image && targetTool.imagePath) {
+          await deleteWashToolStorageImage(targetTool.imagePath);
+          nextImagePath = '';
+        }
+
         await updateDoc(doc(db, 'washTools', targetTool.docId), {
           name: name.trim(),
           category,
@@ -374,10 +439,9 @@ export default function WashToolsPage() {
           purchaseDate,
           price,
           memo,
+          imagePath: nextImagePath,
           updatedAt: new Date().toISOString(),
         });
-
-        await setWashToolImage(targetTool.docId, image ?? null);
 
         setTools((prev) =>
           prev.map((tool) =>
@@ -390,6 +454,7 @@ export default function WashToolsPage() {
                   purchaseDate,
                   price,
                   memo,
+                  imagePath: nextImagePath,
                   image: image ?? undefined,
                 }
               : tool
@@ -410,14 +475,25 @@ export default function WashToolsPage() {
 
         const docRef = await addDoc(collection(db, 'washTools'), {
           ...newToolBase,
+          imagePath: '',
           createdAt: new Date().toISOString(),
         });
 
-        await setWashToolImage(docRef.id, image ?? null);
+        const imagePath = imageFile
+          ? await uploadWashToolImage(docRef.id, imageFile)
+          : '';
+
+        if (imagePath) {
+          await updateDoc(doc(db, 'washTools', docRef.id), {
+            imagePath,
+            updatedAt: new Date().toISOString(),
+          });
+        }
 
         const newTool: WashTool = {
           ...newToolBase,
           docId: docRef.id,
+          imagePath,
           image: image ?? undefined,
         };
 
@@ -444,6 +520,7 @@ export default function WashToolsPage() {
     setPrice(tool.price);
     setMemo(tool.memo);
     setImage(tool.image ?? null);
+    setImageFile(null);
     setEditingId(tool.id);
     setErrors({});
     setSavedMessage(`編集中: ${tool.name}`);
@@ -461,6 +538,7 @@ export default function WashToolsPage() {
       if (targetTool.docId) {
         const { db, doc, deleteDoc } = await getFirebaseModules();
         await deleteDoc(doc(db, 'washTools', targetTool.docId));
+        await deleteWashToolStorageImage(targetTool.imagePath);
         await setWashToolImage(targetTool.docId, null);
       } else {
         await setWashToolImage(getRecordKey(targetTool), null);
@@ -610,7 +688,7 @@ export default function WashToolsPage() {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle()}>写真（この端末のみに保存）</label>
+            <label style={labelStyle()}>写真（Firebase Storageに保存）</label>
             <div
               style={{
                 padding: '14px',
@@ -645,7 +723,10 @@ export default function WashToolsPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => setImage(null)}
+                    onClick={() => {
+                      setImage(null);
+                      setImageFile(null);
+                    }}
                     style={{
                       marginTop: '10px',
                       padding: '9px 13px',
