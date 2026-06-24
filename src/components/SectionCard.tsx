@@ -14,14 +14,16 @@ export default function SectionCard({
   return (
     <section
       style={{
-        border: active ? '1px solid #60a5fa' : '1px solid #27272a',
-        borderRadius: '20px',
+        border: active
+          ? '1px solid rgba(96,165,250,0.7)'
+          : '1px solid rgba(113,113,122,0.22)',
+        borderRadius: '18px',
         padding: '18px',
         background:
-          'linear-gradient(180deg, rgba(39,39,42,0.9) 0%, rgba(24,24,27,0.95) 100%)',
+          'linear-gradient(180deg, rgba(30,30,34,0.9) 0%, rgba(12,12,14,0.98) 100%)',
         boxShadow: active
-          ? '0 0 0 1px rgba(96,165,250,0.18), 0 12px 30px rgba(0,0,0,0.28)'
-          : '0 12px 30px rgba(0,0,0,0.22)',
+          ? '0 0 0 1px rgba(96,165,250,0.18), 0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)'
+          : '0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035)',
         marginBottom,
       }}
     >

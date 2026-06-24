@@ -7,12 +7,13 @@ type AppHeaderCardProps = {
 
 function cardStyle() {
   return {
-    border: '1px solid #27272a',
-    borderRadius: '20px',
+    border: '1px solid rgba(113,113,122,0.24)',
+    borderRadius: '18px',
     padding: '24px',
     background:
-      'linear-gradient(180deg, rgba(39,39,42,0.9) 0%, rgba(24,24,27,0.95) 100%)',
-    boxShadow: '0 12px 30px rgba(0,0,0,0.22)',
+      'linear-gradient(145deg, rgba(39,39,42,0.86) 0%, rgba(12,12,14,0.98) 64%, rgba(24,24,27,0.94) 100%)',
+    boxShadow:
+      '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)',
   } as const;
 }
 
@@ -28,10 +29,10 @@ function sectionLabelStyle() {
 
 function accentLineStyle() {
   return {
-    width: '42px',
-    height: '3px',
+    width: '46px',
+    height: '2px',
     borderRadius: '999px',
-    background: 'linear-gradient(90deg, #fafafa 0%, #71717a 100%)',
+    background: 'linear-gradient(90deg, #f8fafc 0%, #38bdf8 55%, #71717a 100%)',
     marginTop: '10px',
   } as const;
 }
@@ -48,17 +49,19 @@ export default function AppHeaderCard({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
+          gap: '13px',
           marginBottom: '14px',
         }}
       >
         <div
           style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '16px',
-            background: '#18181b',
-            border: '1px solid #27272a',
+            width: '50px',
+            height: '50px',
+            borderRadius: '15px',
+            background:
+              'linear-gradient(145deg, rgba(24,24,27,0.92), rgba(9,9,11,0.98))',
+            border: '1px solid rgba(113,113,122,0.28)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -74,11 +77,11 @@ export default function AppHeaderCard({
         </div>
       </div>
 
-      <h1 style={{ fontSize: '32px', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+      <h1 style={{ fontSize: '31px', margin: '0 0 10px 0', lineHeight: 1.2 }}>
         {title}
       </h1>
 
-      <p style={{ color: '#a1a1aa', margin: 0 }}>{description}</p>
+      <p style={{ color: '#c4c4cc', margin: 0, lineHeight: 1.65 }}>{description}</p>
     </section>
   );
 }

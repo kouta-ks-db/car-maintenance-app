@@ -265,12 +265,13 @@ function calculateFuelEconomy(current: FuelRecord, previous?: FuelRecord) {
 
 function cardStyle() {
   return {
-    border: '1px solid #27272a',
-    borderRadius: '22px',
+    border: '1px solid rgba(113,113,122,0.22)',
+    borderRadius: '18px',
     padding: '18px',
     background:
-      'linear-gradient(180deg, rgba(39,39,42,0.94) 0%, rgba(24,24,27,0.98) 100%)',
-    boxShadow: '0 14px 34px rgba(0,0,0,0.28)',
+      'linear-gradient(180deg, rgba(30,30,34,0.9) 0%, rgba(12,12,14,0.98) 100%)',
+    boxShadow:
+      '0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035)',
   } as const;
 }
 
@@ -286,10 +287,10 @@ function sectionLabelStyle() {
 
 function accentLineStyle() {
   return {
-    width: '42px',
-    height: '3px',
+    width: '46px',
+    height: '2px',
     borderRadius: '999px',
-    background: 'linear-gradient(90deg, #fafafa 0%, #71717a 100%)',
+    background: 'linear-gradient(90deg, #f8fafc 0%, #38bdf8 55%, #71717a 100%)',
     marginTop: '10px',
   } as const;
 }
@@ -808,21 +809,34 @@ export default function HomePage() {
         >
           <div
             style={{
-              position: 'absolute',
-              top: '-40px',
-              right: '-30px',
-              width: '140px',
-              height: '140px',
-              borderRadius: '999px',
-              background: 'rgba(255,255,255,0.06)',
-              filter: 'blur(8px)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: '14px',
+              marginBottom: '18px',
             }}
-          />
+          >
+            <div>
+              <p style={sectionLabelStyle()}>Garage Dashboard</p>
+              <div style={accentLineStyle()} />
+            </div>
+            <span
+              style={{
+                border: '1px solid rgba(56,189,248,0.28)',
+                borderRadius: '999px',
+                padding: '7px 10px',
+                color: '#bae6fd',
+                background: 'rgba(8,47,73,0.36)',
+                fontSize: '12px',
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              LIVE GARAGE
+            </span>
+          </div>
 
-          <p style={sectionLabelStyle()}>Garage Dashboard</p>
-          <div style={accentLineStyle()} />
-
-          <div style={{ marginTop: '18px' }}>
+          <div>
             <h1
               style={{
                 fontSize: '34px',
@@ -1429,6 +1443,40 @@ export default function HomePage() {
             </p>
             <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
               道具・ケミカル・購入メモ
+            </p>
+          </Link>
+
+          <Link
+            href="/wash-tools/categories"
+            style={{
+              ...cardStyle(),
+              textDecoration: 'none',
+              color: '#fafafa',
+              display: 'block',
+              padding: '18px',
+            }}
+          >
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#18181b',
+                border: '1px solid #27272a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                marginBottom: '14px',
+              }}
+            >
+              🗂️
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0' }}>
+              道具カテゴリ
+            </p>
+            <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+              写真付きでカテゴリ別に確認
             </p>
           </Link>
 

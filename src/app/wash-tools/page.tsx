@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
@@ -324,6 +324,21 @@ export default function WashToolsPage() {
   const [errors, setErrors] = useState<WashToolErrors>({});
   const [tools, setTools] = useState<WashTool[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const toolStats = useMemo(() => {
+    const categories = new Set(
+      tools.filter((tool) => tool.name).map((tool) => tool.category)
+    );
+    const totalPrice = tools.reduce((sum, tool) => {
+      const priceValue = Number(tool.price);
+      return Number.isFinite(priceValue) ? sum + priceValue : sum;
+    }, 0);
+
+    return {
+      categoryCount: categories.size,
+      totalPrice,
+    };
+  }, [tools]);
 
   useEffect(() => {
     async function loadTools() {
@@ -664,6 +679,72 @@ export default function WashToolsPage() {
           title="洗車道具"
           description="持っている洗車道具・ケミカル・写真をまとめて管理"
         />
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
+            gap: '12px',
+            marginBottom: '16px',
+          }}
+        >
+          <div
+            style={{
+              border: '1px solid rgba(113,113,122,0.22)',
+              borderRadius: '16px',
+              padding: '14px',
+              background: 'rgba(9,9,11,0.78)',
+            }}
+          >
+            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+              道具
+            </p>
+            <p style={{ margin: 0, fontSize: '24px', fontWeight: 800 }}>
+              {isLoaded ? tools.length : '-'}
+              <span style={{ color: '#a1a1aa', fontSize: '13px', marginLeft: '4px' }}>
+                件
+              </span>
+            </p>
+          </div>
+
+          <div
+            style={{
+              border: '1px solid rgba(113,113,122,0.22)',
+              borderRadius: '16px',
+              padding: '14px',
+              background: 'rgba(9,9,11,0.78)',
+            }}
+          >
+            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+              カテゴリ
+            </p>
+            <p style={{ margin: 0, fontSize: '24px', fontWeight: 800 }}>
+              {isLoaded ? toolStats.categoryCount : '-'}
+              <span style={{ color: '#a1a1aa', fontSize: '13px', marginLeft: '4px' }}>
+                種
+              </span>
+            </p>
+          </div>
+
+          <div
+            style={{
+              border: '1px solid rgba(113,113,122,0.22)',
+              borderRadius: '16px',
+              padding: '14px',
+              background: 'rgba(9,9,11,0.78)',
+            }}
+          >
+            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+              登録金額
+            </p>
+            <p style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>
+              {isLoaded ? toolStats.totalPrice.toLocaleString() : '-'}
+              <span style={{ color: '#a1a1aa', fontSize: '13px', marginLeft: '4px' }}>
+                円
+              </span>
+            </p>
+          </div>
+        </div>
 
         <SectionCard>
           <div

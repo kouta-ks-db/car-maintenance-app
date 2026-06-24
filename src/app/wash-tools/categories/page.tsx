@@ -29,6 +29,16 @@ type WashTool = {
   image?: string;
 };
 
+type FirestoreWashTool = {
+  id?: number;
+  name?: string;
+  category?: WashToolCategory;
+  brand?: string;
+  imageBucket?: string;
+  imagePath?: string;
+  imageUrl?: string;
+};
+
 const TEXT_STORAGE_KEY = 'wash-tools-text';
 const DB_NAME = 'car-maintenance-local-db';
 const DB_VERSION = 2;
@@ -46,6 +56,19 @@ const CATEGORY_OPTIONS: WashToolCategory[] = [
   '高圧洗浄機',
   'その他',
 ];
+
+async function getFirebaseModules() {
+  const [{ db }, firestore] = await Promise.all([
+    import('@/lib/firebase'),
+    import('firebase/firestore/lite'),
+  ]);
+
+  return {
+    db,
+    collection: firestore.collection,
+    getDocs: firestore.getDocs,
+  };
+}
 
 function getRecordKey(record: { docId?: string; id: number }) {
   return record.docId ?? `local-${record.id}`;
@@ -131,11 +154,29 @@ async function hydrateLocalImages(tools: WashTool[]) {
 function toolCardStyle() {
   return {
     minWidth: 0,
-    borderRadius: '14px',
-    border: '1px solid #27272a',
-    background: '#09090b',
+    borderRadius: '15px',
+    border: '1px solid rgba(113,113,122,0.22)',
+    background: 'rgba(9,9,11,0.82)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
     overflow: 'hidden',
   } as const;
+}
+
+function normalizeFirestoreRecord(
+  docId: string,
+  record: FirestoreWashTool,
+  fallbackId: number
+): WashTool {
+  return {
+    id: typeof record.id === 'number' ? record.id : fallbackId,
+    docId,
+    name: record.name ?? '',
+    category: record.category ?? 'その他',
+    brand: record.brand ?? '',
+    imageBucket: record.imageBucket ?? '',
+    imagePath: record.imagePath ?? '',
+    imageUrl: record.imageUrl ?? '',
+  };
 }
 
 export default function WashToolCategoriesPage() {
@@ -145,6 +186,33 @@ export default function WashToolCategoriesPage() {
 
   useEffect(() => {
     async function loadTools() {
+      try {
+        const { db, collection, getDocs } = await getFirebaseModules();
+        const snapshot = await getDocs(collection(db, 'washTools'));
+
+        if (!snapshot.empty) {
+          const firestoreTools = snapshot.docs
+            .map((docItem, index) =>
+              normalizeFirestoreRecord(
+                docItem.id,
+                docItem.data() as FirestoreWashTool,
+                Date.now() + index
+              )
+            )
+            .filter((tool) => tool.name)
+            .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+          const toolsWithImages = await hydrateLocalImages(firestoreTools);
+
+          setTools(toolsWithImages);
+          window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(firestoreTools));
+          setSavedMessage('Firebaseから洗車道具を読み込みました');
+          setIsLoaded(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Firestoreからの読み込みに失敗しました:', error);
+      }
+
       const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
 
       if (!savedTextTools) {
@@ -321,8 +389,9 @@ export default function WashToolCategoriesPage() {
                       <div
                         style={{
                           aspectRatio: '1 / 1',
-                          background: '#18181b',
-                          borderBottom: '1px solid #27272a',
+                          background:
+                            'linear-gradient(145deg, rgba(24,24,27,0.92), rgba(9,9,11,0.98))',
+                          borderBottom: '1px solid rgba(113,113,122,0.18)',
                         }}
                       >
                         {tool.image ? (
