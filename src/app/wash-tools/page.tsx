@@ -665,6 +665,50 @@ export default function WashToolsPage() {
           description="持っている洗車道具・ケミカル・写真をまとめて管理"
         />
 
+        <SectionCard>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  margin: '0 0 6px 0',
+                  color: '#71717a',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                Category View
+              </p>
+              <p style={{ margin: 0, color: '#e4e4e7', fontSize: '14px' }}>
+                写真と道具名をカテゴリごとに確認
+              </p>
+            </div>
+            <Link
+              href="/wash-tools/categories"
+              style={{
+                padding: '10px 13px',
+                borderRadius: '12px',
+                border: '1px solid #3f3f46',
+                background: '#18181b',
+                color: '#fafafa',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              一覧を見る
+            </Link>
+          </div>
+        </SectionCard>
+
         <SectionCard active={editingId !== null}>
           <h2 style={{ fontSize: '20px', margin: '0 0 18px 0' }}>
             {editingId !== null ? '洗車道具を編集' : '洗車道具を登録'}
