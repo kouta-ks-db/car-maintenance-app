@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const GOOGLE_DRIVE_IMAGE_UPLOAD_URL = process.env.GOOGLE_DRIVE_IMAGE_UPLOAD_URL;
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 type GoogleDriveUploadResponse = {
   fileId?: string;
@@ -30,12 +29,17 @@ function getGoogleDriveImageUrl(fileId: string) {
   )}&sz=w1200`;
 }
 
-function getUploadEndpoint() {
-  if (!GOOGLE_DRIVE_IMAGE_UPLOAD_URL) {
+async function getUploadEndpoint() {
+  const { env } = await getCloudflareContext({ async: true });
+  const uploadUrl =
+    process.env.GOOGLE_DRIVE_IMAGE_UPLOAD_URL ||
+    (env as Record<string, string | undefined>).GOOGLE_DRIVE_IMAGE_UPLOAD_URL;
+
+  if (!uploadUrl) {
     throw new Error('GOOGLE_DRIVE_IMAGE_UPLOAD_URL が未設定です');
   }
 
-  return GOOGLE_DRIVE_IMAGE_UPLOAD_URL;
+  return uploadUrl;
 }
 
 export async function POST(request: NextRequest) {
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'file is required' }, { status: 400 });
     }
 
-    const response = await fetch(getUploadEndpoint(), {
+    const response = await fetch(await getUploadEndpoint(), {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
@@ -102,7 +106,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const response = await fetch(getUploadEndpoint(), {
+    const response = await fetch(await getUploadEndpoint(), {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
