@@ -210,7 +210,7 @@ async function uploadWashToolImage(
   const json = await response.json();
 
   if (!response.ok) {
-    throw new Error(json?.error ?? 'Storage画像アップロード失敗');
+    throw new Error(json?.error ?? 'Google Drive画像アップロード失敗');
   }
 
   return json as UploadedWashToolImage;
@@ -222,6 +222,13 @@ async function getWashToolImageUrl(
   imageUrl?: string
 ): Promise<string | undefined> {
   if (imageUrl) return imageUrl;
+
+  if (imageBucket === 'google-drive') {
+    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(
+      imagePath
+    )}&sz=w1200`;
+  }
+
   const bucket =
     imageBucket ||
     (imagePath.includes('appspot.com')
@@ -248,7 +255,7 @@ async function deleteWashToolStorageImage(
       body: JSON.stringify({ imageBucket, imagePath }),
     });
   } catch (error) {
-    console.error('Storage画像の削除に失敗しました:', error);
+    console.error('クラウド画像の削除に失敗しました:', error);
   }
 }
 
@@ -745,7 +752,7 @@ export default function WashToolsPage() {
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle()}>写真（Firebase Storageに保存）</label>
+            <label style={labelStyle()}>写真（Googleドライブに保存）</label>
             <div
               style={{
                 padding: '14px',
