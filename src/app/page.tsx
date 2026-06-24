@@ -1399,6 +1399,40 @@ export default function HomePage() {
           </Link>
 
           <Link
+            href="/wash-tools"
+            style={{
+              ...cardStyle(),
+              textDecoration: 'none',
+              color: '#fafafa',
+              display: 'block',
+              padding: '18px',
+            }}
+          >
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                background: '#18181b',
+                border: '1px solid #27272a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                marginBottom: '14px',
+              }}
+            >
+              🧰
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 6px 0' }}>
+              洗車道具
+            </p>
+            <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+              道具・ケミカル・購入メモ
+            </p>
+          </Link>
+
+          <Link
             href="/maintenance"
             style={{
               ...cardStyle(),

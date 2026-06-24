@@ -6,55 +6,64 @@ import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
 
-type WashMenu =
-  | '手洗い洗車'
-  | 'ポリッシャー'
-  | 'タイヤ洗車'
-  | '簡易コーティング'
-  | '本格コーティング'
-  | 'タイヤコーティング'
-  | '窓の油膜取り'
-  | '窓コーティング';
+type WashToolCategory =
+  | 'シャンプー'
+  | 'コーティング剤'
+  | 'クリーナー'
+  | 'タオル・クロス'
+  | 'スポンジ・ミット'
+  | 'ブラシ'
+  | 'フォームガン'
+  | 'バケツ'
+  | '高圧洗浄機'
+  | 'その他';
 
-type WashRecord = {
+type WashTool = {
   id: number;
   docId?: string;
-  date: string;
-  menus: WashMenu[];
+  name: string;
+  category: WashToolCategory;
+  brand: string;
+  purchaseDate: string;
+  price: string;
   memo: string;
-  products?: string;
   image?: string;
 };
 
-type FirestoreWashRecord = {
+type FirestoreWashTool = {
   id?: number;
-  date?: string;
-  menus?: WashMenu[];
+  name?: string;
+  category?: WashToolCategory;
+  brand?: string;
+  purchaseDate?: string;
+  price?: string;
   memo?: string;
-  products?: string;
   createdAt?: string;
   updatedAt?: string;
 };
 
-type WashErrors = {
-  date?: string;
-  menus?: string;
+type WashToolErrors = {
+  name?: string;
+  category?: string;
+  price?: string;
 };
 
-const TEXT_STORAGE_KEY = 'wash-records-text';
+const TEXT_STORAGE_KEY = 'wash-tools-text';
 const DB_NAME = 'car-maintenance-local-db';
 const DB_VERSION = 2;
-const IMAGE_STORE_NAME = 'wash-images';
+const IMAGE_STORE_NAME = 'wash-tool-images';
 
-const WASH_MENU_OPTIONS: WashMenu[] = [
-  '手洗い洗車',
-  'ポリッシャー',
-  'タイヤ洗車',
-  '簡易コーティング',
-  '本格コーティング',
-  'タイヤコーティング',
-  '窓の油膜取り',
-  '窓コーティング',
+const CATEGORY_OPTIONS: WashToolCategory[] = [
+  'シャンプー',
+  'コーティング剤',
+  'クリーナー',
+  'タオル・クロス',
+  'スポンジ・ミット',
+  'ブラシ',
+  'フォームガン',
+  'バケツ',
+  '高圧洗浄機',
+  'その他',
 ];
 
 async function getFirebaseModules() {
@@ -100,7 +109,7 @@ function getRecordKey(record: { docId?: string; id: number }) {
   return record.docId ?? `local-${record.id}`;
 }
 
-function openWashImageDb(): Promise<IDBDatabase> {
+function openWashToolImageDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
       reject(new Error('IndexedDBが利用できません'));
@@ -112,12 +121,12 @@ function openWashImageDb(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const db = request.result;
 
-      if (!db.objectStoreNames.contains(IMAGE_STORE_NAME)) {
-        db.createObjectStore(IMAGE_STORE_NAME);
+      if (!db.objectStoreNames.contains('wash-images')) {
+        db.createObjectStore('wash-images');
       }
 
-      if (!db.objectStoreNames.contains('wash-tool-images')) {
-        db.createObjectStore('wash-tool-images');
+      if (!db.objectStoreNames.contains(IMAGE_STORE_NAME)) {
+        db.createObjectStore(IMAGE_STORE_NAME);
       }
     };
 
@@ -127,8 +136,8 @@ function openWashImageDb(): Promise<IDBDatabase> {
   });
 }
 
-async function getWashImage(recordKey: string): Promise<string | undefined> {
-  const db = await openWashImageDb();
+async function getWashToolImage(recordKey: string): Promise<string | undefined> {
+  const db = await openWashToolImageDb();
 
   return new Promise((resolve, reject) => {
     const tx = db.transaction(IMAGE_STORE_NAME, 'readonly');
@@ -147,13 +156,15 @@ async function getWashImage(recordKey: string): Promise<string | undefined> {
   });
 }
 
-async function setWashImage(recordKey: string, image: string | null): Promise<void> {
-  const db = await openWashImageDb();
+async function setWashToolImage(
+  recordKey: string,
+  image: string | null
+): Promise<void> {
+  const db = await openWashToolImageDb();
 
   return new Promise((resolve, reject) => {
     const tx = db.transaction(IMAGE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(IMAGE_STORE_NAME);
-
     const request = image ? store.put(image, recordKey) : store.delete(recordKey);
 
     request.onerror = () =>
@@ -171,137 +182,118 @@ async function setWashImage(recordKey: string, image: string | null): Promise<vo
   });
 }
 
-async function deleteWashImage(recordKey: string): Promise<void> {
-  await setWashImage(recordKey, null);
-}
-
-async function hydrateImages(records: WashRecord[]): Promise<WashRecord[]> {
-  const hydrated = await Promise.all(
+async function hydrateImages(records: WashTool[]): Promise<WashTool[]> {
+  return Promise.all(
     records.map(async (record) => {
       try {
-        const image = await getWashImage(getRecordKey(record));
-        return {
-          ...record,
-          image,
-        };
+        const image = await getWashToolImage(getRecordKey(record));
+        return { ...record, image };
       } catch {
-        return {
-          ...record,
-          image: undefined,
-        };
+        return { ...record, image: undefined };
       }
     })
   );
-
-  return hydrated;
 }
 
 function normalizeFirestoreRecord(
   docId: string,
-  record: FirestoreWashRecord,
+  record: FirestoreWashTool,
   fallbackId: number
-): WashRecord {
+): WashTool {
   return {
     id: typeof record.id === 'number' ? record.id : fallbackId,
     docId,
-    date: record.date ?? '',
-    menus: Array.isArray(record.menus) ? record.menus : [],
+    name: record.name ?? '',
+    category: record.category ?? 'その他',
+    brand: record.brand ?? '',
+    purchaseDate: record.purchaseDate ?? '',
+    price: record.price ?? '',
     memo: record.memo ?? '',
-    products: record.products ?? '',
   };
 }
 
-function removeImage(record: WashRecord): Omit<WashRecord, 'image'> {
-  const textOnlyRecord = { ...record };
-  delete textOnlyRecord.image;
-  return textOnlyRecord;
+function removeImage(tool: WashTool): Omit<WashTool, 'image'> {
+  const textOnlyTool = { ...tool };
+  delete textOnlyTool.image;
+  return textOnlyTool;
 }
 
-export default function WashPage() {
-  const [date, setDate] = useState('');
-  const [selectedMenus, setSelectedMenus] = useState<WashMenu[]>([]);
+export default function WashToolsPage() {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState<WashToolCategory>('シャンプー');
+  const [brand, setBrand] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState('');
+  const [price, setPrice] = useState('');
   const [memo, setMemo] = useState('');
-  const [products, setProducts] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [savedMessage, setSavedMessage] = useState('');
-  const [errors, setErrors] = useState<WashErrors>({});
-  const [records, setRecords] = useState<WashRecord[]>([]);
+  const [errors, setErrors] = useState<WashToolErrors>({});
+  const [tools, setTools] = useState<WashTool[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    async function loadRecords() {
+    async function loadTools() {
       try {
         const { db, collection, getDocs } = await getFirebaseModules();
-        const snapshot = await getDocs(collection(db, 'washRecords'));
+        const snapshot = await getDocs(collection(db, 'washTools'));
 
         if (!snapshot.empty) {
-          const firestoreRecords = snapshot.docs
+          const firestoreTools = snapshot.docs
             .map((docItem, index) =>
               normalizeFirestoreRecord(
                 docItem.id,
-                docItem.data() as FirestoreWashRecord,
+                docItem.data() as FirestoreWashTool,
                 Date.now() + index
               )
             )
-            .filter((record) => record.date && record.menus.length > 0)
-            .sort((a, b) => {
-              const aTime = new Date(a.date).getTime();
-              const bTime = new Date(b.date).getTime();
-              return bTime - aTime;
-            });
+            .filter((tool) => tool.name)
+            .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
-          const recordsWithImages = await hydrateImages(firestoreRecords);
-          setRecords(recordsWithImages);
-
-          const textOnlyRecords = firestoreRecords.map(removeImage);
-          window.localStorage.setItem(
-            TEXT_STORAGE_KEY,
-            JSON.stringify(textOnlyRecords)
-          );
-
-          setSavedMessage('Firebaseから洗車記録を読み込みました');
+          const toolsWithImages = await hydrateImages(firestoreTools);
+          setTools(toolsWithImages);
+          window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(firestoreTools));
+          setSavedMessage('Firebaseから洗車道具を読み込みました');
           setIsLoaded(true);
           return;
         }
 
-        const savedTextRecords = window.localStorage.getItem(TEXT_STORAGE_KEY);
+        const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
 
-        if (savedTextRecords) {
-          const parsed = JSON.parse(savedTextRecords) as Omit<WashRecord, 'image'>[];
-          const recordsWithImages = await hydrateImages(parsed as WashRecord[]);
-          setRecords(recordsWithImages);
-          setSavedMessage('localStorageから洗車記録を読み込みました');
+        if (savedTextTools) {
+          const parsed = JSON.parse(savedTextTools) as Omit<WashTool, 'image'>[];
+          const toolsWithImages = await hydrateImages(parsed as WashTool[]);
+          setTools(toolsWithImages);
+          setSavedMessage('localStorageから洗車道具を読み込みました');
         } else {
-          setRecords([]);
-          setSavedMessage('記録がありません');
+          setTools([]);
+          setSavedMessage('登録された道具がありません');
         }
       } catch (error) {
         console.error('Firestoreからの読み込みに失敗しました:', error);
 
         const errorMessage =
           error instanceof Error ? error.message : 'unknown error';
+        const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
 
-        const savedTextRecords = window.localStorage.getItem(TEXT_STORAGE_KEY);
-
-        if (savedTextRecords) {
+        if (savedTextTools) {
           try {
-            const parsed = JSON.parse(savedTextRecords) as Omit<WashRecord, 'image'>[];
-            const recordsWithImages = await hydrateImages(parsed as WashRecord[]);
-            setRecords(recordsWithImages);
+            const parsed = JSON.parse(savedTextTools) as Omit<WashTool, 'image'>[];
+            const toolsWithImages = await hydrateImages(parsed as WashTool[]);
+            setTools(toolsWithImages);
             setSavedMessage(
               `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
             );
           } catch {
-            setRecords([]);
+            setTools([]);
             setSavedMessage(
-              `Firebase読み込み失敗: ${errorMessage} / 記録がありません`
+              `Firebase読み込み失敗: ${errorMessage} / 登録された道具がありません`
             );
           }
         } else {
-          setRecords([]);
+          setTools([]);
           setSavedMessage(
-            `Firebase読み込み失敗: ${errorMessage} / 記録がありません`
+            `Firebase読み込み失敗: ${errorMessage} / 登録された道具がありません`
           );
         }
       } finally {
@@ -309,15 +301,26 @@ export default function WashPage() {
       }
     }
 
-    loadRecords();
+    loadTools();
   }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
 
-    const textOnlyRecords = records.map(removeImage);
-    window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(textOnlyRecords));
-  }, [records, isLoaded]);
+    const textOnlyTools = tools.map(removeImage);
+    window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(textOnlyTools));
+  }, [tools, isLoaded]);
+
+  function resetForm() {
+    setName('');
+    setCategory('シャンプー');
+    setBrand('');
+    setPurchaseDate('');
+    setPrice('');
+    setMemo('');
+    setImage(null);
+    setErrors({});
+  }
 
   function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -330,24 +333,19 @@ export default function WashPage() {
     reader.readAsDataURL(file);
   }
 
-  function toggleMenu(menu: WashMenu) {
-    setSelectedMenus((prev) => {
-      const exists = prev.includes(menu);
-      return exists ? prev.filter((item) => item !== menu) : [...prev, menu];
-    });
-
-    setErrors((prev) => ({ ...prev, menus: undefined }));
-  }
-
   async function handleSave() {
-    const newErrors: WashErrors = {};
+    const newErrors: WashToolErrors = {};
 
-    if (!date) {
-      newErrors.date = '洗車日を入れてください';
+    if (!name.trim()) {
+      newErrors.name = '道具名を入れてください';
     }
 
-    if (selectedMenus.length === 0) {
-      newErrors.menus = '実施内容を1つ以上選んでください';
+    if (!category) {
+      newErrors.category = 'カテゴリを選んでください';
+    }
+
+    if (price && Number(price) < 0) {
+      newErrors.price = '0以上の値にしてください';
     }
 
     setErrors(newErrors);
@@ -362,71 +360,72 @@ export default function WashPage() {
         await getFirebaseModules();
 
       if (editingId !== null) {
-        const targetRecord = records.find((record) => record.id === editingId);
+        const targetTool = tools.find((tool) => tool.id === editingId);
 
-        if (!targetRecord?.docId) {
+        if (!targetTool?.docId) {
           setSavedMessage('更新対象のFirebaseデータが見つかりませんでした');
           return;
         }
 
-        await updateDoc(doc(db, 'washRecords', targetRecord.docId), {
-          date,
-          menus: selectedMenus,
+        await updateDoc(doc(db, 'washTools', targetTool.docId), {
+          name: name.trim(),
+          category,
+          brand,
+          purchaseDate,
+          price,
           memo,
-          products,
           updatedAt: new Date().toISOString(),
         });
 
-        const updatedRecords = records.map((record) =>
-          record.id === editingId
-            ? {
-                ...record,
-                date,
-                menus: selectedMenus,
-                memo,
-                products,
-                image: image ?? undefined,
-              }
-            : record
+        await setWashToolImage(targetTool.docId, image ?? null);
+
+        setTools((prev) =>
+          prev.map((tool) =>
+            tool.id === editingId
+              ? {
+                  ...tool,
+                  name: name.trim(),
+                  category,
+                  brand,
+                  purchaseDate,
+                  price,
+                  memo,
+                  image: image ?? undefined,
+                }
+              : tool
+          )
         );
-
-        await setWashImage(targetRecord.docId, image ?? null);
-
-        setRecords(updatedRecords);
-        setSavedMessage('洗車記録を更新しました');
+        setSavedMessage('洗車道具を更新しました');
         setEditingId(null);
       } else {
-        const newRecordBase = {
+        const newToolBase = {
           id: Date.now(),
-          date,
-          menus: selectedMenus,
+          name: name.trim(),
+          category,
+          brand,
+          purchaseDate,
+          price,
           memo,
-          products,
         };
 
-        const docRef = await addDoc(collection(db, 'washRecords'), {
-          ...newRecordBase,
+        const docRef = await addDoc(collection(db, 'washTools'), {
+          ...newToolBase,
           createdAt: new Date().toISOString(),
         });
 
-        await setWashImage(docRef.id, image ?? null);
+        await setWashToolImage(docRef.id, image ?? null);
 
-        const newRecord: WashRecord = {
-          ...newRecordBase,
+        const newTool: WashTool = {
+          ...newToolBase,
           docId: docRef.id,
           image: image ?? undefined,
         };
 
-        setRecords((prev) => [newRecord, ...prev]);
-        setSavedMessage('洗車記録を保存しました');
+        setTools((prev) => [newTool, ...prev]);
+        setSavedMessage('洗車道具を保存しました');
       }
 
-      setDate('');
-      setSelectedMenus([]);
-      setMemo('');
-      setProducts('');
-      setImage(null);
-      setErrors({});
+      resetForm();
     } catch (error) {
       console.error('保存に失敗しました:', error);
 
@@ -437,50 +436,44 @@ export default function WashPage() {
     }
   }
 
-  function handleEdit(record: WashRecord) {
-    setDate(record.date);
-    setSelectedMenus(record.menus);
-    setMemo(record.memo);
-    setProducts(record.products ?? '');
-    setImage(record.image ?? null);
-    setEditingId(record.id);
+  function handleEdit(tool: WashTool) {
+    setName(tool.name);
+    setCategory(tool.category);
+    setBrand(tool.brand);
+    setPurchaseDate(tool.purchaseDate);
+    setPrice(tool.price);
+    setMemo(tool.memo);
+    setImage(tool.image ?? null);
+    setEditingId(tool.id);
     setErrors({});
-    setSavedMessage(`編集中: ${record.date} の洗車記録`);
+    setSavedMessage(`編集中: ${tool.name}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function handleDelete(id: number) {
-    const targetRecord = records.find((record) => record.id === id);
-    if (!targetRecord) return;
+    const targetTool = tools.find((tool) => tool.id === id);
+    if (!targetTool) return;
 
-    const ok = window.confirm(
-      `${targetRecord.date} / ${targetRecord.menus.join('、')} を削除しますか？`
-    );
+    const ok = window.confirm(`${targetTool.name} を削除しますか？`);
     if (!ok) return;
 
     try {
-      if (targetRecord.docId) {
+      if (targetTool.docId) {
         const { db, doc, deleteDoc } = await getFirebaseModules();
-        await deleteDoc(doc(db, 'washRecords', targetRecord.docId));
-        await deleteWashImage(targetRecord.docId);
+        await deleteDoc(doc(db, 'washTools', targetTool.docId));
+        await setWashToolImage(targetTool.docId, null);
       } else {
-        await deleteWashImage(getRecordKey(targetRecord));
+        await setWashToolImage(getRecordKey(targetTool), null);
       }
 
-      const nextRecords = records.filter((record) => record.id !== id);
-      setRecords(nextRecords);
+      setTools((prev) => prev.filter((tool) => tool.id !== id));
 
       if (editingId === id) {
         setEditingId(null);
-        setDate('');
-        setSelectedMenus([]);
-        setMemo('');
-        setProducts('');
-        setImage(null);
-        setErrors({});
+        resetForm();
       }
 
-      setSavedMessage('洗車記録を削除しました');
+      setSavedMessage('洗車道具を削除しました');
     } catch (error) {
       console.error('削除に失敗しました:', error);
 
@@ -493,12 +486,7 @@ export default function WashPage() {
 
   function handleCancelEdit() {
     setEditingId(null);
-    setDate('');
-    setSelectedMenus([]);
-    setMemo('');
-    setProducts('');
-    setImage(null);
-    setErrors({});
+    resetForm();
     setSavedMessage('編集をキャンセルしました');
   }
 
@@ -529,92 +517,96 @@ export default function WashPage() {
         </Link>
 
         <AppHeaderCard
-          icon="🧼"
-          englishLabel="Wash Log"
-          title="洗車記録"
-          description="洗車メニュー・使用洗剤・施工メモ・写真をまとめて管理"
+          icon="🧰"
+          englishLabel="Wash Tools"
+          title="洗車道具"
+          description="持っている洗車道具・ケミカル・写真をまとめて管理"
         />
 
         <SectionCard active={editingId !== null}>
           <h2 style={{ fontSize: '20px', margin: '0 0 18px 0' }}>
-            {editingId !== null ? '洗車記録を編集' : '洗車を入力'}
+            {editingId !== null ? '洗車道具を編集' : '洗車道具を登録'}
           </h2>
 
           <div style={{ marginBottom: '16px' }}>
-            <DateInputWithPicker
-              label="洗車日"
-              value={date}
-              onChange={(value) => {
-                setDate(value);
-                setErrors((prev) => ({ ...prev, date: undefined }));
+            <label style={labelStyle()}>道具名</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setErrors((prev) => ({ ...prev, name: undefined }));
               }}
-              error={errors.date}
+              placeholder="例: カーシャンプー、マイクロファイバークロス"
+              style={inputStyle(!!errors.name)}
             />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <p style={{ ...labelStyle(), marginBottom: '10px' }}>実施内容</p>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '10px',
-              }}
-            >
-              {WASH_MENU_OPTIONS.map((menu) => {
-                const checked = selectedMenus.includes(menu);
-
-                return (
-                  <label
-                    key={menu}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '14px',
-                      borderRadius: '14px',
-                      border: checked ? '1px solid #60a5fa' : '1px solid #3f3f46',
-                      background: checked ? '#172554' : '#09090b',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: checked ? '#eff6ff' : '#fafafa',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleMenu(menu)}
-                    />
-                    <span>{menu}</span>
-                  </label>
-                );
-              })}
-            </div>
-
-            {errors.menus ? (
-              <p
-                style={{
-                  color: '#f87171',
-                  fontSize: '14px',
-                  marginTop: '8px',
-                  marginBottom: 0,
-                }}
-              >
-                {errors.menus}
+            {errors.name ? (
+              <p style={{ color: '#f87171', fontSize: '14px', margin: '8px 0 0 0' }}>
+                {errors.name}
               </p>
             ) : null}
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={labelStyle()}>使用洗剤・ケミカル</label>
+            <label style={labelStyle()}>カテゴリ</label>
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value as WashToolCategory);
+                setErrors((prev) => ({ ...prev, category: undefined }));
+              }}
+              style={inputStyle(!!errors.category)}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            {errors.category ? (
+              <p style={{ color: '#f87171', fontSize: '14px', margin: '8px 0 0 0' }}>
+                {errors.category}
+              </p>
+            ) : null}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle()}>メーカー・ブランド</label>
             <input
               type="text"
-              value={products}
-              onChange={(e) => setProducts(e.target.value)}
-              placeholder="例: カーシャンプー、簡易コート剤、ガラスクリーナー"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="例: SONAX、SurLuster、Koch Chemie"
               style={inputStyle(false)}
             />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <DateInputWithPicker
+              label="購入日"
+              value={purchaseDate}
+              onChange={setPurchaseDate}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle()}>価格</label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => {
+                setPrice(e.target.value);
+                setErrors((prev) => ({ ...prev, price: undefined }));
+              }}
+              min="0"
+              placeholder="例: 1980"
+              style={inputStyle(!!errors.price)}
+            />
+            {errors.price ? (
+              <p style={{ color: '#f87171', fontSize: '14px', margin: '8px 0 0 0' }}>
+                {errors.price}
+              </p>
+            ) : null}
           </div>
 
           <div style={{ marginBottom: '16px' }}>
@@ -638,18 +630,37 @@ export default function WashPage() {
               />
 
               {image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={image}
-                  alt="洗車記録のプレビュー"
-                  style={{
-                    width: '100%',
-                    marginTop: '14px',
-                    borderRadius: '14px',
-                    border: '1px solid #27272a',
-                    objectFit: 'cover',
-                  }}
-                />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image}
+                    alt="洗車道具のプレビュー"
+                    style={{
+                      width: '100%',
+                      marginTop: '14px',
+                      borderRadius: '14px',
+                      border: '1px solid #27272a',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImage(null)}
+                    style={{
+                      marginTop: '10px',
+                      padding: '9px 13px',
+                      borderRadius: '12px',
+                      border: '1px solid #3f3f46',
+                      background: 'transparent',
+                      color: '#fafafa',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    写真を外す
+                  </button>
+                </>
               ) : (
                 <p
                   style={{
@@ -670,7 +681,7 @@ export default function WashPage() {
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               rows={4}
-              placeholder="例: 花粉が多かった、窓も施工した"
+              placeholder="例: ホイール用、濃い汚れ用、残量少なめ"
               style={{ ...inputStyle(false), resize: 'vertical' }}
             />
           </div>
@@ -741,21 +752,21 @@ export default function WashPage() {
               marginBottom: '14px',
             }}
           >
-            <h2 style={{ fontSize: '20px', margin: 0 }}>洗車記録一覧</h2>
+            <h2 style={{ fontSize: '20px', margin: 0 }}>洗車道具一覧</h2>
             <span style={{ color: '#71717a', fontSize: '13px' }}>
-              {isLoaded ? `${records.length} 件` : '読み込み中...'}
+              {isLoaded ? `${tools.length} 件` : '読み込み中...'}
             </span>
           </div>
 
           {!isLoaded ? (
             <p style={{ color: '#a1a1aa', margin: 0 }}>読み込み中...</p>
-          ) : records.length === 0 ? (
-            <p style={{ color: '#a1a1aa', margin: 0 }}>記録がありません</p>
+          ) : tools.length === 0 ? (
+            <p style={{ color: '#a1a1aa', margin: 0 }}>登録された道具がありません</p>
           ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
-              {records.map((record) => (
+              {tools.map((tool) => (
                 <div
-                  key={record.id}
+                  key={tool.id}
                   style={{
                     borderRadius: '16px',
                     border: '1px solid #27272a',
@@ -763,31 +774,48 @@ export default function WashPage() {
                     padding: '16px',
                   }}
                 >
-                  <p style={{ margin: '0 0 6px 0', fontSize: '17px', fontWeight: 700 }}>
-                    {record.date}
-                  </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      alignItems: 'flex-start',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    <div>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '17px', fontWeight: 700 }}>
+                        {tool.name}
+                      </p>
+                      <p style={{ margin: 0, color: '#a1a1aa', fontSize: '14px' }}>
+                        {tool.category}
+                        {tool.brand ? ` / ${tool.brand}` : ''}
+                      </p>
+                    </div>
+                    {tool.price ? (
+                      <span style={{ color: '#e4e4e7', fontSize: '14px', fontWeight: 700 }}>
+                        {Number(tool.price).toLocaleString()}円
+                      </span>
+                    ) : null}
+                  </div>
 
-                  <p style={{ margin: '0 0 8px 0', color: '#a1a1aa', fontSize: '14px' }}>
-                    {record.menus.join('、')}
-                  </p>
-
-                  {record.products ? (
+                  {tool.purchaseDate ? (
                     <p style={{ margin: '0 0 8px 0', color: '#d4d4d8', fontSize: '14px' }}>
-                      🧴 {record.products}
+                      購入日: {tool.purchaseDate}
                     </p>
                   ) : null}
 
-                  {record.memo ? (
+                  {tool.memo ? (
                     <p style={{ margin: '0 0 12px 0', color: '#d4d4d8', fontSize: '14px' }}>
-                      {record.memo}
+                      {tool.memo}
                     </p>
                   ) : null}
 
-                  {record.image ? (
+                  {tool.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={record.image}
-                      alt="洗車記録の写真"
+                      src={tool.image}
+                      alt="洗車道具の写真"
                       style={{
                         width: '100%',
                         borderRadius: '14px',
@@ -800,7 +828,7 @@ export default function WashPage() {
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
-                      onClick={() => handleEdit(record)}
+                      onClick={() => handleEdit(tool)}
                       style={{
                         padding: '9px 13px',
                         borderRadius: '12px',
@@ -816,7 +844,7 @@ export default function WashPage() {
                     </button>
 
                     <button
-                      onClick={() => handleDelete(record.id)}
+                      onClick={() => handleDelete(tool.id)}
                       style={{
                         padding: '9px 13px',
                         borderRadius: '12px',
