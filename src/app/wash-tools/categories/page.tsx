@@ -22,27 +22,11 @@ type WashTool = {
   docId?: string;
   name: string;
   category: WashToolCategory;
-  brand: string;
-  purchaseDate: string;
-  price: string;
-  memo: string;
+  brand?: string;
   imageBucket?: string;
   imagePath?: string;
   imageUrl?: string;
   image?: string;
-};
-
-type FirestoreWashTool = {
-  id?: number;
-  name?: string;
-  category?: WashToolCategory;
-  brand?: string;
-  purchaseDate?: string;
-  price?: string;
-  memo?: string;
-  imageBucket?: string;
-  imagePath?: string;
-  imageUrl?: string;
 };
 
 const TEXT_STORAGE_KEY = 'wash-tools-text';
@@ -63,21 +47,20 @@ const CATEGORY_OPTIONS: WashToolCategory[] = [
   'その他',
 ];
 
-async function getFirebaseModules() {
-  const [{ db }, firestore] = await Promise.all([
-    import('@/lib/firebase'),
-    import('firebase/firestore/lite'),
-  ]);
-
-  return {
-    db,
-    collection: firestore.collection,
-    getDocs: firestore.getDocs,
-  };
-}
-
 function getRecordKey(record: { docId?: string; id: number }) {
   return record.docId ?? `local-${record.id}`;
+}
+
+function getCloudImageUrl(tool: WashTool) {
+  if (tool.imageUrl) return tool.imageUrl;
+
+  if (tool.imageBucket === 'google-drive' && tool.imagePath) {
+    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(
+      tool.imagePath
+    )}&sz=w1200`;
+  }
+
+  return '';
 }
 
 function openWashToolImageDb(): Promise<IDBDatabase> {
@@ -107,7 +90,7 @@ function openWashToolImageDb(): Promise<IDBDatabase> {
   });
 }
 
-async function getWashToolImage(recordKey: string): Promise<string | undefined> {
+async function getLocalImage(recordKey: string): Promise<string | undefined> {
   const db = await openWashToolImageDb();
 
   return new Promise((resolve, reject) => {
@@ -127,73 +110,22 @@ async function getWashToolImage(recordKey: string): Promise<string | undefined> 
   });
 }
 
-async function getWashToolImageUrl(
-  imagePath: string,
-  imageBucket?: string,
-  imageUrl?: string
-): Promise<string | undefined> {
-  if (imageUrl) return imageUrl;
-
-  if (imageBucket === 'google-drive') {
-    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(
-      imagePath
-    )}&sz=w1200`;
-  }
-
-  const bucket =
-    imageBucket ||
-    (imagePath.includes('appspot.com')
-      ? 'car-maintenance-app-f120a.appspot.com'
-      : 'car-maintenance-app-f120a.firebasestorage.app');
-
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
-    imagePath
-  )}?alt=media`;
-}
-
-async function hydrateImages(records: WashTool[]): Promise<WashTool[]> {
+async function hydrateLocalImages(tools: WashTool[]) {
   return Promise.all(
-    records.map(async (record) => {
-      if (record.imagePath) {
-        const cloudImage = await getWashToolImageUrl(
-          record.imagePath,
-          record.imageBucket,
-          record.imageUrl
-        );
+    tools.map(async (tool) => {
+      const cloudImage = getCloudImageUrl(tool);
 
-        if (cloudImage) {
-          return { ...record, image: cloudImage };
-        }
+      if (cloudImage) {
+        return { ...tool, image: cloudImage };
       }
 
       try {
-        const image = await getWashToolImage(getRecordKey(record));
-        return { ...record, image };
+        return { ...tool, image: await getLocalImage(getRecordKey(tool)) };
       } catch {
-        return { ...record, image: undefined };
+        return { ...tool, image: undefined };
       }
     })
   );
-}
-
-function normalizeFirestoreRecord(
-  docId: string,
-  record: FirestoreWashTool,
-  fallbackId: number
-): WashTool {
-  return {
-    id: typeof record.id === 'number' ? record.id : fallbackId,
-    docId,
-    name: record.name ?? '',
-    category: record.category ?? 'その他',
-    brand: record.brand ?? '',
-    purchaseDate: record.purchaseDate ?? '',
-    price: record.price ?? '',
-    memo: record.memo ?? '',
-    imageBucket: record.imageBucket ?? '',
-    imagePath: record.imagePath ?? '',
-    imageUrl: record.imageUrl ?? '',
-  };
 }
 
 function toolCardStyle() {
@@ -213,67 +145,32 @@ export default function WashToolCategoriesPage() {
 
   useEffect(() => {
     async function loadTools() {
+      const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
+
+      if (!savedTextTools) {
+        setTools([]);
+        setSavedMessage('洗車道具ページで読み込むと一覧に反映されます');
+        setIsLoaded(true);
+        return;
+      }
+
       try {
-        const { db, collection, getDocs } = await getFirebaseModules();
-        const snapshot = await getDocs(collection(db, 'washTools'));
+        const parsed = JSON.parse(savedTextTools) as WashTool[];
+        const normalized = parsed
+          .filter((tool) => tool.name)
+          .map((tool) => ({
+            ...tool,
+            category: tool.category ?? 'その他',
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+        const toolsWithImages = await hydrateLocalImages(normalized);
 
-        if (!snapshot.empty) {
-          const firestoreTools = snapshot.docs
-            .map((docItem, index) =>
-              normalizeFirestoreRecord(
-                docItem.id,
-                docItem.data() as FirestoreWashTool,
-                Date.now() + index
-              )
-            )
-            .filter((tool) => tool.name)
-            .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-          const toolsWithImages = await hydrateImages(firestoreTools);
-
-          setTools(toolsWithImages);
-          window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(firestoreTools));
-          setSavedMessage('Firebaseから洗車道具を読み込みました');
-          return;
-        }
-
-        const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
-
-        if (savedTextTools) {
-          const parsed = JSON.parse(savedTextTools) as WashTool[];
-          const toolsWithImages = await hydrateImages(parsed);
-          setTools(toolsWithImages);
-          setSavedMessage('localStorageから洗車道具を読み込みました');
-        } else {
-          setTools([]);
-          setSavedMessage('登録された道具がありません');
-        }
+        setTools(toolsWithImages);
+        setSavedMessage('保存済みの洗車道具を読み込みました');
       } catch (error) {
         console.error('洗車道具の読み込みに失敗しました:', error);
-
-        const errorMessage =
-          error instanceof Error ? error.message : 'unknown error';
-        const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
-
-        if (savedTextTools) {
-          try {
-            const parsed = JSON.parse(savedTextTools) as WashTool[];
-            const toolsWithImages = await hydrateImages(parsed);
-            setTools(toolsWithImages);
-            setSavedMessage(
-              `Firebase読み込み失敗: ${errorMessage} / localStorageを表示しています`
-            );
-          } catch {
-            setTools([]);
-            setSavedMessage(
-              `Firebase読み込み失敗: ${errorMessage} / 登録された道具がありません`
-            );
-          }
-        } else {
-          setTools([]);
-          setSavedMessage(
-            `Firebase読み込み失敗: ${errorMessage} / 登録された道具がありません`
-          );
-        }
+        setTools([]);
+        setSavedMessage('洗車道具の読み込みに失敗しました');
       } finally {
         setIsLoaded(true);
       }
