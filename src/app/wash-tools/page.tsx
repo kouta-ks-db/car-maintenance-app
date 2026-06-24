@@ -58,10 +58,6 @@ const TEXT_STORAGE_KEY = 'wash-tools-text';
 const DB_NAME = 'car-maintenance-local-db';
 const DB_VERSION = 2;
 const IMAGE_STORE_NAME = 'wash-tool-images';
-const STORAGE_BUCKETS = [
-  'car-maintenance-app-f120a.firebasestorage.app',
-  'car-maintenance-app-f120a.appspot.com',
-];
 
 const CATEGORY_OPTIONS: WashToolCategory[] = [
   'シャンプー',
@@ -192,80 +188,32 @@ async function setWashToolImage(
   });
 }
 
-function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-}
-
 type UploadedWashToolImage = {
   imageBucket: string;
   imagePath: string;
   imageUrl: string;
 };
 
-function getStorageDownloadUrl(bucket: string, imagePath: string, token?: string) {
-  const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
-    imagePath
-  )}?alt=media`;
-
-  return token ? `${baseUrl}&token=${encodeURIComponent(token)}` : baseUrl;
-}
-
 async function uploadWashToolImage(
   docId: string,
   file: File
 ): Promise<UploadedWashToolImage> {
-  const imagePath = `wash-tools/${docId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-  const token = crypto.randomUUID();
-  const boundary = `wash-tool-${Date.now()}`;
-  const metadata = JSON.stringify({
-    metadata: {
-      firebaseStorageDownloadTokens: token,
-    },
+  const formData = new FormData();
+  formData.append('docId', docId);
+  formData.append('file', file);
+
+  const response = await fetch('/api/wash-tool-image', {
+    method: 'POST',
+    body: formData,
   });
-  const fileBuffer = await file.arrayBuffer();
 
-  const body = new Blob(
-    [
-      `--${boundary}\r\n`,
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n',
-      metadata,
-      '\r\n',
-      `--${boundary}\r\n`,
-      `Content-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
-      fileBuffer,
-      '\r\n',
-      `--${boundary}--`,
-    ],
-    { type: `multipart/related; boundary=${boundary}` }
-  );
+  const json = await response.json();
 
-  let lastError = '';
-
-  for (const bucket of STORAGE_BUCKETS) {
-    const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=multipart&name=${encodeURIComponent(
-      imagePath
-    )}`;
-
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    });
-
-    if (response.ok) {
-      return {
-        imageBucket: bucket,
-        imagePath,
-        imageUrl: getStorageDownloadUrl(bucket, imagePath, token),
-      };
-    }
-
-    lastError = await response.text();
+  if (!response.ok) {
+    throw new Error(json?.error ?? 'Storage画像アップロード失敗');
   }
 
-  throw new Error(`Storage画像アップロード失敗: ${lastError}`);
+  return json as UploadedWashToolImage;
 }
 
 async function getWashToolImageUrl(
@@ -274,7 +222,15 @@ async function getWashToolImageUrl(
   imageUrl?: string
 ): Promise<string | undefined> {
   if (imageUrl) return imageUrl;
-  return getStorageDownloadUrl(imageBucket ?? STORAGE_BUCKETS[0], imagePath);
+  const bucket =
+    imageBucket ||
+    (imagePath.includes('appspot.com')
+      ? 'car-maintenance-app-f120a.appspot.com'
+      : 'car-maintenance-app-f120a.firebasestorage.app');
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
+    imagePath
+  )}?alt=media`;
 }
 
 async function deleteWashToolStorageImage(
@@ -284,13 +240,13 @@ async function deleteWashToolStorageImage(
   if (!imagePath) return;
 
   try {
-    const bucket = imageBucket ?? STORAGE_BUCKETS[0];
-    await fetch(
-      `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
-        imagePath
-      )}`,
-      { method: 'DELETE' }
-    );
+    await fetch('/api/wash-tool-image', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageBucket, imagePath }),
+    });
   } catch (error) {
     console.error('Storage画像の削除に失敗しました:', error);
   }
