@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "preview": "opennextjs-cloudflare build && wrangler dev",
-    "deploy": "opennextjs-cloudflare build && wrangler deploy"
+    "preview": "opennextjs-cloudflare build && wrangler dev --config wrangler.jsonc",
+    "deploy": "opennextjs-cloudflare build && wrangler deploy --config wrangler.jsonc"
   },
   "dependencies": {
     "firebase": "^12.12.0",
