@@ -27,7 +27,9 @@ type WashTool = {
   purchaseDate: string;
   price: string;
   memo: string;
+  imageBucket?: string;
   imagePath?: string;
+  imageUrl?: string;
   image?: string;
 };
 
@@ -39,7 +41,9 @@ type FirestoreWashTool = {
   purchaseDate?: string;
   price?: string;
   memo?: string;
+  imageBucket?: string;
   imagePath?: string;
+  imageUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -54,7 +58,10 @@ const TEXT_STORAGE_KEY = 'wash-tools-text';
 const DB_NAME = 'car-maintenance-local-db';
 const DB_VERSION = 2;
 const IMAGE_STORE_NAME = 'wash-tool-images';
-const STORAGE_BUCKET = 'car-maintenance-app-f120a.firebasestorage.app';
+const STORAGE_BUCKETS = [
+  'car-maintenance-app-f120a.firebasestorage.app',
+  'car-maintenance-app-f120a.appspot.com',
+];
 
 const CATEGORY_OPTIONS: WashToolCategory[] = [
   'シャンプー',
@@ -189,40 +196,97 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-async function uploadWashToolImage(docId: string, file: File): Promise<string> {
-  const imagePath = `wash-tools/${docId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-  const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o?uploadType=media&name=${encodeURIComponent(
-    imagePath
-  )}`;
+type UploadedWashToolImage = {
+  imageBucket: string;
+  imagePath: string;
+  imageUrl: string;
+};
 
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': file.type || 'application/octet-stream',
-    },
-    body: file,
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Storage画像アップロード失敗: ${message}`);
-  }
-
-  return imagePath;
-}
-
-async function getWashToolImageUrl(imagePath: string): Promise<string | undefined> {
-  return `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(
+function getStorageDownloadUrl(bucket: string, imagePath: string, token?: string) {
+  const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
     imagePath
   )}?alt=media`;
+
+  return token ? `${baseUrl}&token=${encodeURIComponent(token)}` : baseUrl;
 }
 
-async function deleteWashToolStorageImage(imagePath?: string): Promise<void> {
+async function uploadWashToolImage(
+  docId: string,
+  file: File
+): Promise<UploadedWashToolImage> {
+  const imagePath = `wash-tools/${docId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const token = crypto.randomUUID();
+  const boundary = `wash-tool-${Date.now()}`;
+  const metadata = JSON.stringify({
+    metadata: {
+      firebaseStorageDownloadTokens: token,
+    },
+  });
+  const fileBuffer = await file.arrayBuffer();
+
+  const body = new Blob(
+    [
+      `--${boundary}\r\n`,
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+      metadata,
+      '\r\n',
+      `--${boundary}\r\n`,
+      `Content-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
+      fileBuffer,
+      '\r\n',
+      `--${boundary}--`,
+    ],
+    { type: `multipart/related; boundary=${boundary}` }
+  );
+
+  let lastError = '';
+
+  for (const bucket of STORAGE_BUCKETS) {
+    const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=multipart&name=${encodeURIComponent(
+      imagePath
+    )}`;
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    });
+
+    if (response.ok) {
+      return {
+        imageBucket: bucket,
+        imagePath,
+        imageUrl: getStorageDownloadUrl(bucket, imagePath, token),
+      };
+    }
+
+    lastError = await response.text();
+  }
+
+  throw new Error(`Storage画像アップロード失敗: ${lastError}`);
+}
+
+async function getWashToolImageUrl(
+  imagePath: string,
+  imageBucket?: string,
+  imageUrl?: string
+): Promise<string | undefined> {
+  if (imageUrl) return imageUrl;
+  return getStorageDownloadUrl(imageBucket ?? STORAGE_BUCKETS[0], imagePath);
+}
+
+async function deleteWashToolStorageImage(
+  imagePath?: string,
+  imageBucket?: string
+): Promise<void> {
   if (!imagePath) return;
 
   try {
+    const bucket = imageBucket ?? STORAGE_BUCKETS[0];
     await fetch(
-      `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(
+      `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(
         imagePath
       )}`,
       { method: 'DELETE' }
@@ -236,7 +300,11 @@ async function hydrateImages(records: WashTool[]): Promise<WashTool[]> {
   return Promise.all(
     records.map(async (record) => {
       if (record.imagePath) {
-        const cloudImage = await getWashToolImageUrl(record.imagePath);
+        const cloudImage = await getWashToolImageUrl(
+          record.imagePath,
+          record.imageBucket,
+          record.imageUrl
+        );
 
         if (cloudImage) {
           return { ...record, image: cloudImage };
@@ -267,7 +335,9 @@ function normalizeFirestoreRecord(
     purchaseDate: record.purchaseDate ?? '',
     price: record.price ?? '',
     memo: record.memo ?? '',
+    imageBucket: record.imageBucket ?? '',
     imagePath: record.imagePath ?? '',
+    imageUrl: record.imageUrl ?? '',
   };
 }
 
@@ -429,15 +499,28 @@ export default function WashToolsPage() {
           return;
         }
 
+        let nextImageBucket = targetTool.imageBucket ?? '';
         let nextImagePath = targetTool.imagePath ?? '';
+        let nextImageUrl = targetTool.imageUrl ?? '';
 
         if (imageFile) {
-          nextImagePath = await uploadWashToolImage(targetTool.docId, imageFile);
-          await deleteWashToolStorageImage(targetTool.imagePath);
+          const uploadedImage = await uploadWashToolImage(targetTool.docId, imageFile);
+          nextImageBucket = uploadedImage.imageBucket;
+          nextImagePath = uploadedImage.imagePath;
+          nextImageUrl = uploadedImage.imageUrl;
+          await deleteWashToolStorageImage(
+            targetTool.imagePath,
+            targetTool.imageBucket
+          );
           await setWashToolImage(targetTool.docId, null);
         } else if (!image && targetTool.imagePath) {
-          await deleteWashToolStorageImage(targetTool.imagePath);
+          await deleteWashToolStorageImage(
+            targetTool.imagePath,
+            targetTool.imageBucket
+          );
+          nextImageBucket = '';
           nextImagePath = '';
+          nextImageUrl = '';
         }
 
         await updateDoc(doc(db, 'washTools', targetTool.docId), {
@@ -447,7 +530,9 @@ export default function WashToolsPage() {
           purchaseDate,
           price,
           memo,
+          imageBucket: nextImageBucket,
           imagePath: nextImagePath,
+          imageUrl: nextImageUrl,
           updatedAt: new Date().toISOString(),
         });
 
@@ -462,8 +547,10 @@ export default function WashToolsPage() {
                   purchaseDate,
                   price,
                   memo,
+                  imageBucket: nextImageBucket,
                   imagePath: nextImagePath,
-                  image: image ?? undefined,
+                  imageUrl: nextImageUrl,
+                  image: nextImageUrl || image || undefined,
                 }
               : tool
           )
@@ -483,17 +570,21 @@ export default function WashToolsPage() {
 
         const docRef = await addDoc(collection(db, 'washTools'), {
           ...newToolBase,
+          imageBucket: '',
           imagePath: '',
+          imageUrl: '',
           createdAt: new Date().toISOString(),
         });
 
-        const imagePath = imageFile
+        const uploadedImage = imageFile
           ? await uploadWashToolImage(docRef.id, imageFile)
-          : '';
+          : null;
 
-        if (imagePath) {
+        if (uploadedImage) {
           await updateDoc(doc(db, 'washTools', docRef.id), {
-            imagePath,
+            imageBucket: uploadedImage.imageBucket,
+            imagePath: uploadedImage.imagePath,
+            imageUrl: uploadedImage.imageUrl,
             updatedAt: new Date().toISOString(),
           });
         }
@@ -501,8 +592,10 @@ export default function WashToolsPage() {
         const newTool: WashTool = {
           ...newToolBase,
           docId: docRef.id,
-          imagePath,
-          image: image ?? undefined,
+          imageBucket: uploadedImage?.imageBucket ?? '',
+          imagePath: uploadedImage?.imagePath ?? '',
+          imageUrl: uploadedImage?.imageUrl ?? '',
+          image: uploadedImage?.imageUrl ?? image ?? undefined,
         };
 
         setTools((prev) => [newTool, ...prev]);
@@ -546,7 +639,7 @@ export default function WashToolsPage() {
       if (targetTool.docId) {
         const { db, doc, deleteDoc } = await getFirebaseModules();
         await deleteDoc(doc(db, 'washTools', targetTool.docId));
-        await deleteWashToolStorageImage(targetTool.imagePath);
+        await deleteWashToolStorageImage(targetTool.imagePath, targetTool.imageBucket);
         await setWashToolImage(targetTool.docId, null);
       } else {
         await setWashToolImage(getRecordKey(targetTool), null);
