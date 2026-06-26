@@ -15,6 +15,34 @@ type DailyWeather = {
   windSpeedMax: number;
 };
 
+type CurrentWeather = {
+  time: string;
+  weatherCode: number;
+  temperature: number | null;
+  apparentTemperature: number | null;
+  humidity: number | null;
+  precipitation: number | null;
+  cloudCover: number | null;
+  pressure: number | null;
+  windSpeed: number | null;
+  windDirection: number | null;
+  windGusts: number | null;
+};
+
+type HourlyWeather = {
+  time: string;
+  weatherCode: number;
+  temperature: number | null;
+  apparentTemperature: number | null;
+  humidity: number | null;
+  precipitationProbability: number | null;
+  precipitation: number | null;
+  cloudCover: number | null;
+  windSpeed: number | null;
+  windGusts: number | null;
+  uvIndex: number | null;
+};
+
 type AirDay = {
   date: string;
   dustMax: number | null;
@@ -39,6 +67,8 @@ type LocationMode = 'current' | 'favorite';
 
 type WeatherPageState = {
   locationLabel: string;
+  currentWeather: CurrentWeather | null;
+  hourlyWeather: HourlyWeather[];
   weatherDays: DailyWeather[];
   dustDays: AirDay[];
   error: string;
@@ -122,6 +152,60 @@ function getDustLabel(dust: number | null) {
   if (dust >= 40) return 'やや多い';
   if (dust >= 20) return '少なめ';
   return '少ない';
+}
+
+function getRainRiskLabel(probability: number | null, precipitation: number | null) {
+  const probabilityValue = probability ?? 0;
+  const precipitationValue = precipitation ?? 0;
+
+  if (probabilityValue >= 70 || precipitationValue >= 2) return '高い';
+  if (probabilityValue >= 40 || precipitationValue >= 0.5) return '注意';
+  if (probabilityValue >= 20 || precipitationValue > 0) return '低め';
+  return 'ほぼなし';
+}
+
+function getHourlyWashLabel(hour: HourlyWeather) {
+  const rain = hour.precipitationProbability ?? 0;
+  const precipitation = hour.precipitation ?? 0;
+  const wind = hour.windSpeed ?? 0;
+  const gusts = hour.windGusts ?? 0;
+
+  if (rain >= 60 || precipitation >= 1 || wind >= 8 || gusts >= 12) {
+    return {
+      label: '見送り',
+      color: '#fecaca',
+      background: '#450a0a',
+      border: '#991b1b',
+    };
+  }
+
+  if (rain >= 30 || precipitation > 0 || wind >= 5 || gusts >= 8) {
+    return {
+      label: '注意',
+      color: '#fde68a',
+      background: '#422006',
+      border: '#a16207',
+    };
+  }
+
+  return {
+    label: '良い',
+    color: '#bfdbfe',
+    background: 'rgba(14,165,233,0.18)',
+    border: '#1d4ed8',
+  };
+}
+
+function formatHour(time: string) {
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return time.slice(11, 16);
+
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function getRecommendationStyle(level: RecommendationLevel) {
@@ -224,6 +308,8 @@ function saveFavorites(favorites: FavoriteLocation[]) {
 
 async function fetchWeatherByCoords(latitude: number, longitude: number): Promise<{
   locationLabel: string;
+  currentWeather: CurrentWeather | null;
+  hourlyWeather: HourlyWeather[];
   weatherDays: DailyWeather[];
   dustDays: AirDay[];
 }> {
@@ -241,6 +327,23 @@ async function fetchWeatherByCoords(latitude: number, longitude: number): Promis
   const weatherJson = json.weather;
   const airJson = json.air;
   const locationLabel = json.locationLabel ?? '現在地';
+  const current = weatherJson.current;
+
+  const currentWeather: CurrentWeather | null = current
+    ? {
+        time: current.time ?? '',
+        weatherCode: current.weather_code ?? 0,
+        temperature: current.temperature_2m ?? null,
+        apparentTemperature: current.apparent_temperature ?? null,
+        humidity: current.relative_humidity_2m ?? null,
+        precipitation: current.precipitation ?? null,
+        cloudCover: current.cloud_cover ?? null,
+        pressure: current.pressure_msl ?? null,
+        windSpeed: current.wind_speed_10m ?? null,
+        windDirection: current.wind_direction_10m ?? null,
+        windGusts: current.wind_gusts_10m ?? null,
+      }
+    : null;
 
   const weatherDays: DailyWeather[] = (weatherJson.daily.time as string[]).map(
     (date: string, index: number) => ({
@@ -254,11 +357,27 @@ async function fetchWeatherByCoords(latitude: number, longitude: number): Promis
     })
   );
 
+  const hourly = weatherJson.hourly;
+  const hourlyTimes: string[] = hourly?.time ?? [];
+  const hourlyWeather: HourlyWeather[] = hourlyTimes.map((time, index) => ({
+    time,
+    weatherCode: hourly?.weather_code?.[index] ?? 0,
+    temperature: hourly?.temperature_2m?.[index] ?? null,
+    apparentTemperature: hourly?.apparent_temperature?.[index] ?? null,
+    humidity: hourly?.relative_humidity_2m?.[index] ?? null,
+    precipitationProbability: hourly?.precipitation_probability?.[index] ?? null,
+    precipitation: hourly?.precipitation?.[index] ?? null,
+    cloudCover: hourly?.cloud_cover?.[index] ?? null,
+    windSpeed: hourly?.wind_speed_10m?.[index] ?? null,
+    windGusts: hourly?.wind_gusts_10m?.[index] ?? null,
+    uvIndex: hourly?.uv_index?.[index] ?? null,
+  }));
+
   const dustByDay = new Map<string, number | null>();
-  const hourlyTimes: string[] = airJson?.hourly?.time ?? [];
+  const airHourlyTimes: string[] = airJson?.hourly?.time ?? [];
   const hourlyDust: (number | null)[] = airJson?.hourly?.dust ?? [];
 
-  hourlyTimes.forEach((time, index) => {
+  airHourlyTimes.forEach((time, index) => {
     const day = time.slice(0, 10);
     const dust = hourlyDust[index];
 
@@ -282,6 +401,8 @@ async function fetchWeatherByCoords(latitude: number, longitude: number): Promis
 
   return {
     locationLabel,
+    currentWeather,
+    hourlyWeather,
     weatherDays,
     dustDays,
   };
@@ -290,6 +411,8 @@ async function fetchWeatherByCoords(latitude: number, longitude: number): Promis
 export default function WeatherPage() {
   const [state, setState] = useState<WeatherPageState>({
     locationLabel: '取得中...',
+    currentWeather: null,
+    hourlyWeather: [],
     weatherDays: [],
     dustDays: [],
     error: '',
@@ -335,6 +458,8 @@ export default function WeatherPage() {
 
           setState({
             locationLabel: favorite.label || result.locationLabel,
+            currentWeather: result.currentWeather,
+            hourlyWeather: result.hourlyWeather,
             weatherDays: result.weatherDays,
             dustDays: result.dustDays,
             error: '',
@@ -362,6 +487,8 @@ export default function WeatherPage() {
 
         setState({
           locationLabel: result.locationLabel,
+          currentWeather: result.currentWeather,
+          hourlyWeather: result.hourlyWeather,
           weatherDays: result.weatherDays,
           dustDays: result.dustDays,
           error: '',
@@ -634,6 +761,68 @@ export default function WeatherPage() {
         </SectionCard>
 
         <SectionCard>
+          <p style={sectionLabelStyle()}>Current Conditions</p>
+          <div style={accentLineStyle()} />
+
+          {state.loading ? (
+            <p style={{ marginTop: '16px', color: '#a1a1aa' }}>読み込み中...</p>
+          ) : state.error ? (
+            <p style={{ marginTop: '16px', color: '#fca5a5' }}>
+              現在天気の取得に失敗しました: {state.error}
+            </p>
+          ) : state.currentWeather ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.1fr 1fr',
+                gap: '14px',
+                marginTop: '16px',
+              }}
+            >
+              <div style={cardStyle()}>
+                <p style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '12px' }}>
+                  現在の天気
+                </p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '34px', fontWeight: 800 }}>
+                  {getWeatherIcon(state.currentWeather.weatherCode)}{' '}
+                  {state.currentWeather.temperature ?? '-'}°
+                </p>
+                <p style={{ margin: '0 0 8px 0', color: '#cbd5e1' }}>
+                  {getWeatherLabel(state.currentWeather.weatherCode)}
+                </p>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+                  体感 {state.currentWeather.apparentTemperature ?? '-'}° / 湿度{' '}
+                  {state.currentWeather.humidity ?? '-'}%
+                </p>
+              </div>
+
+              <div style={cardStyle()}>
+                <p style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '12px' }}>
+                  詳細
+                </p>
+                <p style={{ margin: '0 0 7px 0' }}>
+                  降水: {state.currentWeather.precipitation ?? '-'} mm
+                </p>
+                <p style={{ margin: '0 0 7px 0' }}>
+                  雲量: {state.currentWeather.cloudCover ?? '-'}%
+                </p>
+                <p style={{ margin: '0 0 7px 0' }}>
+                  風: {state.currentWeather.windSpeed ?? '-'} m/s
+                  {state.currentWeather.windGusts != null
+                    ? ` / 突風 ${state.currentWeather.windGusts} m/s`
+                    : ''}
+                </p>
+                <p style={{ margin: 0 }}>
+                  気圧: {state.currentWeather.pressure ?? '-'} hPa
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p style={{ marginTop: '16px', color: '#a1a1aa' }}>データがありません</p>
+          )}
+        </SectionCard>
+
+        <SectionCard>
           <p style={sectionLabelStyle()}>Today&apos;s Wash Score</p>
           <div style={accentLineStyle()} />
 
@@ -695,6 +884,79 @@ export default function WeatherPage() {
                   黄砂参考: {getDustLabel(today.dustMax)}
                 </p>
               </div>
+            </div>
+          ) : (
+            <p style={{ marginTop: '16px', color: '#a1a1aa' }}>データがありません</p>
+          )}
+        </SectionCard>
+
+        <SectionCard>
+          <p style={sectionLabelStyle()}>48-Hour Forecast</p>
+          <div style={accentLineStyle()} />
+
+          {state.loading ? (
+            <p style={{ marginTop: '16px', color: '#a1a1aa' }}>読み込み中...</p>
+          ) : state.error ? (
+            <p style={{ marginTop: '16px', color: '#fca5a5' }}>
+              時間別予報の取得に失敗しました: {state.error}
+            </p>
+          ) : state.hourlyWeather.length > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                overflowX: 'auto',
+                padding: '16px 2px 4px',
+              }}
+            >
+              {state.hourlyWeather.slice(0, 48).map((hour) => {
+                const wash = getHourlyWashLabel(hour);
+
+                return (
+                  <div
+                    key={hour.time}
+                    style={{
+                      ...cardStyle(),
+                      minWidth: '168px',
+                      padding: '14px',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
+                      {formatHour(hour.time)}
+                    </p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 800 }}>
+                      {getWeatherIcon(hour.weatherCode)} {hour.temperature ?? '-'}°
+                    </p>
+                    <p style={{ margin: '0 0 8px 0', color: '#cbd5e1', fontSize: '14px' }}>
+                      {getWeatherLabel(hour.weatherCode)}
+                    </p>
+                    <p style={{ margin: '0 0 6px 0', color: '#cbd5e1', fontSize: '13px' }}>
+                      降水: {hour.precipitationProbability ?? '-'}% /{' '}
+                      {hour.precipitation ?? '-'}mm
+                    </p>
+                    <p style={{ margin: '0 0 6px 0', color: '#cbd5e1', fontSize: '13px' }}>
+                      風: {hour.windSpeed ?? '-'} m/s
+                    </p>
+                    <p style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '13px' }}>
+                      雨リスク: {getRainRiskLabel(hour.precipitationProbability, hour.precipitation)}
+                    </p>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        border: `1px solid ${wash.border}`,
+                        background: wash.background,
+                        color: wash.color,
+                        fontWeight: 800,
+                        fontSize: '13px',
+                      }}
+                    >
+                      洗車: {wash.label}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p style={{ marginTop: '16px', color: '#a1a1aa' }}>データがありません</p>

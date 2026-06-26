@@ -29,6 +29,11 @@ type MaintenanceRecord = {
   docId?: string;
   date: string;
   menu?: string;
+  odometer?: string;
+  nextDate?: string;
+  nextOdometer?: string;
+  productName?: string;
+  location?: string;
   price?: string;
   memo?: string;
 };
@@ -72,6 +77,11 @@ type FirestoreMaintenanceRecord = {
   id?: number;
   date?: string;
   menu?: string;
+  odometer?: string;
+  nextDate?: string;
+  nextOdometer?: string;
+  productName?: string;
+  location?: string;
   price?: string;
   memo?: string;
 };
@@ -160,7 +170,10 @@ const DEFAULT_MAINTENANCE_RECORDS: MaintenanceRecord[] = [
   {
     id: 1,
     date: '2026-04-12',
-    menu: 'インテリア追加',
+    menu: 'インテリア',
+    odometer: '45200',
+    productName: '車内収納トレー',
+    location: 'DIY',
     price: '3500',
     memo: '車内の小物を追加',
   },
@@ -575,6 +588,11 @@ export default function HomePage() {
                   docId: docItem.id,
                   date: data.date ?? '',
                   menu: data.menu ?? '',
+                  odometer: data.odometer ?? '',
+                  nextDate: data.nextDate ?? '',
+                  nextOdometer: data.nextOdometer ?? '',
+                  productName: data.productName ?? '',
+                  location: data.location ?? '',
                   price: data.price ?? '',
                   memo: data.memo ?? '',
                 };
@@ -774,6 +792,10 @@ export default function HomePage() {
       category: 'maintenance',
       title: 'メンテ記録',
       subtitle: `${record.menu ?? '-'}${
+        record.productName ? ` / ${record.productName}` : ''
+      }${
+        record.odometer ? ` / ${Number(record.odometer).toLocaleString()}km` : ''
+      }${
         record.price ? ` / ${Number(record.price).toLocaleString()}円` : ''
       }`,
       icon: '🔧',

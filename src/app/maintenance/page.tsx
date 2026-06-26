@@ -8,15 +8,24 @@ import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
 
 type MaintenanceMenu =
-  | 'インテリア追加'
-  | 'エクステリア追加'
+  | 'インテリア'
+  | 'エクステリア'
+  | 'タイヤ交換'
+  | 'オイル交換'
   | 'パーツ交換';
+
+type MaintenanceLocation = 'DIY' | 'ディーラー' | '整備工場' | 'カー用品店' | 'その他';
 
 type MaintenanceRecord = {
   id: number;
   docId?: string;
   date: string;
   menu: MaintenanceMenu;
+  odometer: string;
+  nextDate: string;
+  nextOdometer: string;
+  productName: string;
+  location: MaintenanceLocation;
   price: string;
   memo: string;
 };
@@ -25,6 +34,11 @@ type OldMaintenanceRecord = {
   id: number;
   date: string;
   menu?: string;
+  odometer?: string;
+  nextDate?: string;
+  nextOdometer?: string;
+  productName?: string;
+  location?: string;
   price?: string;
   memo?: string;
 };
@@ -32,7 +46,12 @@ type OldMaintenanceRecord = {
 type FirestoreMaintenanceRecord = {
   id?: number;
   date?: string;
-  menu?: MaintenanceMenu;
+  menu?: string;
+  odometer?: string;
+  nextDate?: string;
+  nextOdometer?: string;
+  productName?: string;
+  location?: string;
   price?: string;
   memo?: string;
   createdAt?: string;
@@ -42,22 +61,39 @@ type FirestoreMaintenanceRecord = {
 type MaintenanceErrors = {
   date?: string;
   menu?: string;
+  odometer?: string;
+  nextOdometer?: string;
   price?: string;
 };
 
 const STORAGE_KEY = 'maintenance-records';
 
 const MENU_OPTIONS: MaintenanceMenu[] = [
-  'インテリア追加',
-  'エクステリア追加',
+  'インテリア',
+  'エクステリア',
+  'タイヤ交換',
+  'オイル交換',
   'パーツ交換',
+];
+
+const LOCATION_OPTIONS: MaintenanceLocation[] = [
+  'DIY',
+  'ディーラー',
+  '整備工場',
+  'カー用品店',
+  'その他',
 ];
 
 const DEFAULT_RECORDS: MaintenanceRecord[] = [
   {
     id: 1,
     date: '2026-04-12',
-    menu: 'インテリア追加',
+    menu: 'インテリア',
+    odometer: '45200',
+    nextDate: '',
+    nextOdometer: '',
+    productName: '車内収納トレー',
+    location: 'DIY',
     price: '3500',
     memo: '車内の小物を追加',
   },
@@ -65,16 +101,42 @@ const DEFAULT_RECORDS: MaintenanceRecord[] = [
     id: 2,
     date: '2026-04-05',
     menu: 'パーツ交換',
+    odometer: '44800',
+    nextDate: '',
+    nextOdometer: '',
+    productName: 'ワイパー',
+    location: 'カー用品店',
     price: '2800',
     memo: 'ワイパー交換',
   },
 ];
 
+function normalizeMenu(menu?: string): MaintenanceMenu {
+  if (menu === 'インテリア追加') return 'インテリア';
+  if (menu === 'エクステリア追加') return 'エクステリア';
+  if (MENU_OPTIONS.includes(menu as MaintenanceMenu)) {
+    return menu as MaintenanceMenu;
+  }
+  return 'インテリア';
+}
+
+function normalizeLocation(location?: string): MaintenanceLocation {
+  if (LOCATION_OPTIONS.includes(location as MaintenanceLocation)) {
+    return location as MaintenanceLocation;
+  }
+  return 'DIY';
+}
+
 function normalizeLocalRecord(record: OldMaintenanceRecord): MaintenanceRecord {
   return {
     id: record.id,
     date: record.date ?? '',
-    menu: (record.menu as MaintenanceMenu) ?? 'インテリア追加',
+    menu: normalizeMenu(record.menu),
+    odometer: record.odometer ?? '',
+    nextDate: record.nextDate ?? '',
+    nextOdometer: record.nextOdometer ?? '',
+    productName: record.productName ?? '',
+    location: normalizeLocation(record.location),
     price: record.price ?? '',
     memo: record.memo ?? '',
   };
@@ -89,7 +151,12 @@ function normalizeFirestoreRecord(
     id: typeof record.id === 'number' ? record.id : fallbackId,
     docId,
     date: record.date ?? '',
-    menu: record.menu ?? 'インテリア追加',
+    menu: normalizeMenu(record.menu),
+    odometer: record.odometer ?? '',
+    nextDate: record.nextDate ?? '',
+    nextOdometer: record.nextOdometer ?? '',
+    productName: record.productName ?? '',
+    location: normalizeLocation(record.location),
     price: record.price ?? '',
     memo: record.memo ?? '',
   };
@@ -143,7 +210,12 @@ function inputStyle(hasError = false) {
 
 export default function MaintenancePage() {
   const [date, setDate] = useState('');
-  const [menu, setMenu] = useState<MaintenanceMenu>('インテリア追加');
+  const [menu, setMenu] = useState<MaintenanceMenu>('インテリア');
+  const [odometer, setOdometer] = useState('');
+  const [nextDate, setNextDate] = useState('');
+  const [nextOdometer, setNextOdometer] = useState('');
+  const [productName, setProductName] = useState('');
+  const [location, setLocation] = useState<MaintenanceLocation>('DIY');
   const [price, setPrice] = useState('');
   const [memo, setMemo] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -262,6 +334,14 @@ export default function MaintenancePage() {
       newErrors.price = '0以上の値にしてください';
     }
 
+    if (odometer && Number(odometer) < 0) {
+      newErrors.odometer = '0以上の値にしてください';
+    }
+
+    if (nextOdometer && Number(nextOdometer) < 0) {
+      newErrors.nextOdometer = '0以上の値にしてください';
+    }
+
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
@@ -284,6 +364,11 @@ export default function MaintenancePage() {
         await updateDoc(doc(db, 'maintenanceRecords', targetRecord.docId), {
           date,
           menu,
+          odometer,
+          nextDate,
+          nextOdometer,
+          productName,
+          location,
           price,
           memo,
           updatedAt: new Date().toISOString(),
@@ -296,6 +381,11 @@ export default function MaintenancePage() {
                   ...record,
                   date,
                   menu,
+                  odometer,
+                  nextDate,
+                  nextOdometer,
+                  productName,
+                  location,
                   price,
                   memo,
                 }
@@ -315,6 +405,11 @@ export default function MaintenancePage() {
           id: Date.now(),
           date,
           menu,
+          odometer,
+          nextDate,
+          nextOdometer,
+          productName,
+          location,
           price,
           memo,
         };
@@ -340,7 +435,12 @@ export default function MaintenancePage() {
       }
 
       setDate('');
-      setMenu('インテリア追加');
+      setMenu('インテリア');
+      setOdometer('');
+      setNextDate('');
+      setNextOdometer('');
+      setProductName('');
+      setLocation('DIY');
       setPrice('');
       setMemo('');
       setErrors({});
@@ -359,6 +459,11 @@ export default function MaintenancePage() {
   function handleEdit(record: MaintenanceRecord) {
     setDate(record.date);
     setMenu(record.menu);
+    setOdometer(record.odometer);
+    setNextDate(record.nextDate);
+    setNextOdometer(record.nextOdometer);
+    setProductName(record.productName);
+    setLocation(record.location);
     setPrice(record.price);
     setMemo(record.memo);
     setEditingId(record.id);
@@ -390,7 +495,12 @@ export default function MaintenancePage() {
       if (editingId === id) {
         setEditingId(null);
         setDate('');
-        setMenu('インテリア追加');
+        setMenu('インテリア');
+        setOdometer('');
+        setNextDate('');
+        setNextOdometer('');
+        setProductName('');
+        setLocation('DIY');
         setPrice('');
         setMemo('');
         setErrors({});
@@ -410,7 +520,12 @@ export default function MaintenancePage() {
   function handleCancelEdit() {
     setEditingId(null);
     setDate('');
-    setMenu('インテリア追加');
+    setMenu('インテリア');
+    setOdometer('');
+    setNextDate('');
+    setNextOdometer('');
+    setProductName('');
+    setLocation('DIY');
     setPrice('');
     setMemo('');
     setErrors({});
@@ -449,7 +564,7 @@ export default function MaintenancePage() {
           icon="🔧"
           englishLabel="Maintenance Log"
           title="メンテ記録"
-          description="インテリア・エクステリア・パーツ交換をまとめて管理"
+          description="交換履歴・走行距離・次回目安・使用部品をまとめて管理"
         />
 
         <SectionCard>
@@ -519,6 +634,59 @@ export default function MaintenancePage() {
             </div>
 
             <div>
+              <label style={labelStyle()}>走行距離 (km)</label>
+              <input
+                type="number"
+                value={odometer}
+                onChange={(e) => {
+                  setOdometer(e.target.value);
+                  setErrors((prev) => ({ ...prev, odometer: undefined }));
+                }}
+                min="0"
+                placeholder="例: 45200"
+                style={inputStyle(!!errors.odometer)}
+              />
+              {errors.odometer ? (
+                <p
+                  style={{
+                    color: '#f87171',
+                    fontSize: '14px',
+                    marginTop: '8px',
+                    marginBottom: 0,
+                  }}
+                >
+                  {errors.odometer}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label style={labelStyle()}>製品名・部品名</label>
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="例: Mobil 1 0W-20、PIAA ワイパー"
+                style={inputStyle(false)}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle()}>実施場所</label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value as MaintenanceLocation)}
+                style={inputStyle(false)}
+              >
+                {LOCATION_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label style={labelStyle()}>価格 (円)</label>
               <input
                 type="number"
@@ -540,6 +708,39 @@ export default function MaintenancePage() {
                   }}
                 >
                   {errors.price}
+                </p>
+              ) : null}
+            </div>
+
+            <DateInputWithPicker
+              label="次回目安日"
+              value={nextDate}
+              onChange={setNextDate}
+            />
+
+            <div>
+              <label style={labelStyle()}>次回目安距離 (km)</label>
+              <input
+                type="number"
+                value={nextOdometer}
+                onChange={(e) => {
+                  setNextOdometer(e.target.value);
+                  setErrors((prev) => ({ ...prev, nextOdometer: undefined }));
+                }}
+                min="0"
+                placeholder="例: 50200"
+                style={inputStyle(!!errors.nextOdometer)}
+              />
+              {errors.nextOdometer ? (
+                <p
+                  style={{
+                    color: '#f87171',
+                    fontSize: '14px',
+                    marginTop: '8px',
+                    marginBottom: 0,
+                  }}
+                >
+                  {errors.nextOdometer}
                 </p>
               ) : null}
             </div>
@@ -653,9 +854,44 @@ export default function MaintenancePage() {
                     {record.menu}
                   </p>
 
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: '8px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    {record.odometer ? (
+                      <p style={{ margin: 0, color: '#cbd5e1', fontSize: '14px' }}>
+                        距離: {Number(record.odometer).toLocaleString()}km
+                      </p>
+                    ) : null}
+
+                    {record.productName ? (
+                      <p style={{ margin: 0, color: '#cbd5e1', fontSize: '14px' }}>
+                        製品: {record.productName}
+                      </p>
+                    ) : null}
+
+                    <p style={{ margin: 0, color: '#cbd5e1', fontSize: '14px' }}>
+                      場所: {record.location}
+                    </p>
+                  </div>
+
                   <p style={{ margin: '0 0 8px 0', color: '#d4d4d8', fontSize: '14px' }}>
                     {Number(record.price).toLocaleString()}円
                   </p>
+
+                  {record.nextDate || record.nextOdometer ? (
+                    <p style={{ margin: '0 0 8px 0', color: '#bfdbfe', fontSize: '14px' }}>
+                      次回目安:
+                      {record.nextDate ? ` ${record.nextDate}` : ''}
+                      {record.nextOdometer
+                        ? ` / ${Number(record.nextOdometer).toLocaleString()}km`
+                        : ''}
+                    </p>
+                  ) : null}
 
                   {record.memo ? (
                     <p style={{ margin: '0 0 12px 0', color: '#d4d4d8', fontSize: '14px' }}>
