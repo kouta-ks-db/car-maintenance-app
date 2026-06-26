@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AppBottomNav from '@/components/AppBottomNav';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import SectionCard from '@/components/SectionCard';
 
@@ -259,9 +260,9 @@ export default function WashToolCategoriesPage() {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top, rgba(63,63,70,0.45) 0%, #0a0a0b 28%, #09090b 100%)',
-        color: '#fafafa',
-        padding: '24px',
+          'radial-gradient(circle at top left, rgba(34,211,238,0.20) 0%, rgba(59,130,246,0.13) 26%, transparent 48%), radial-gradient(circle at bottom right, rgba(16,185,129,0.14) 0%, transparent 36%), linear-gradient(180deg, #111827 0%, #0f172a 48%, #111827 100%)',
+        color: '#f8fafc',
+        padding: '24px 24px 112px',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -290,7 +291,7 @@ export default function WashToolCategoriesPage() {
           <Link
             href="/"
             style={{
-              color: '#71717a',
+              color: '#94a3b8',
               textDecoration: 'none',
               fontSize: '14px',
             }}
@@ -319,7 +320,7 @@ export default function WashToolCategoriesPage() {
               <p
                 style={{
                   margin: '0 0 8px 0',
-                  color: '#71717a',
+                  color: '#94a3b8',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
@@ -332,7 +333,7 @@ export default function WashToolCategoriesPage() {
             <p
               style={{
                 margin: 0,
-                color: '#fafafa',
+                color: '#f8fafc',
                 fontSize: '28px',
                 fontWeight: 800,
               }}
@@ -426,7 +427,7 @@ export default function WashToolCategoriesPage() {
                         <p
                           style={{
                             margin: 0,
-                            color: '#fafafa',
+                            color: '#f8fafc',
                             fontSize: '14px',
                             fontWeight: 700,
                             lineHeight: 1.35,
@@ -453,7 +454,7 @@ export default function WashToolCategoriesPage() {
                   ))}
                 </div>
               ) : (
-                <p style={{ margin: 0, color: '#71717a', fontSize: '14px' }}>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
                   このカテゴリの道具はまだありません
                 </p>
               )}
@@ -461,6 +462,7 @@ export default function WashToolCategoriesPage() {
           ))}
         </div>
       </div>
+      <AppBottomNav active="tools" />
     </main>
   );
 }

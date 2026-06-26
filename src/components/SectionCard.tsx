@@ -15,15 +15,17 @@ export default function SectionCard({
     <section
       style={{
         border: active
-          ? '1px solid rgba(96,165,250,0.7)'
-          : '1px solid rgba(113,113,122,0.22)',
-        borderRadius: '18px',
-        padding: '18px',
+          ? '1px solid rgba(14,165,233,0.5)'
+          : '1px solid rgba(226,232,240,0.16)',
+        borderRadius: '22px',
+        padding: '20px',
         background:
-          'linear-gradient(180deg, rgba(30,30,34,0.9) 0%, rgba(12,12,14,0.98) 100%)',
+          'linear-gradient(180deg, rgba(30,41,59,0.86) 0%, rgba(15,23,42,0.9) 100%)',
         boxShadow: active
-          ? '0 0 0 1px rgba(96,165,250,0.18), 0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)'
-          : '0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035)',
+          ? '0 0 0 1px rgba(14,165,233,0.14), 0 22px 54px rgba(15,23,42,0.38), inset 0 1px 0 rgba(255,255,255,0.1)'
+          : '0 18px 44px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
         marginBottom,
       }}
     >

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AppBottomNav from '@/components/AppBottomNav';
 
 type FuelRecord = {
   id: number;
@@ -265,19 +266,21 @@ function calculateFuelEconomy(current: FuelRecord, previous?: FuelRecord) {
 
 function cardStyle() {
   return {
-    border: '1px solid rgba(113,113,122,0.22)',
-    borderRadius: '18px',
-    padding: '18px',
+    border: '1px solid rgba(226,232,240,0.16)',
+    borderRadius: '22px',
+    padding: '20px',
     background:
-      'linear-gradient(180deg, rgba(30,30,34,0.9) 0%, rgba(12,12,14,0.98) 100%)',
+      'linear-gradient(180deg, rgba(30,41,59,0.86) 0%, rgba(15,23,42,0.9) 100%)',
     boxShadow:
-      '0 14px 34px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035)',
+      '0 18px 44px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
   } as const;
 }
 
 function sectionLabelStyle() {
   return {
-    color: '#71717a',
+    color: '#94a3b8',
     fontSize: '12px',
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
@@ -290,7 +293,7 @@ function accentLineStyle() {
     width: '46px',
     height: '2px',
     borderRadius: '999px',
-    background: 'linear-gradient(90deg, #f8fafc 0%, #38bdf8 55%, #71717a 100%)',
+    background: 'linear-gradient(90deg, #22d3ee 0%, #60a5fa 48%, #a78bfa 100%)',
     marginTop: '10px',
   } as const;
 }
@@ -362,15 +365,15 @@ function getRecommendationStyle(level: RecommendationLevel) {
     return {
       text: '#bfdbfe',
       border: '#1d4ed8',
-      background: '#172554',
+      background: 'rgba(14,165,233,0.18)',
     };
   }
 
   if (level === 'good') {
     return {
       text: '#f4f4f5',
-      border: '#3f3f46',
-      background: '#18181b',
+      border: 'rgba(226,232,240,0.18)',
+      background: 'rgba(30,41,59,0.72)',
     };
   }
 
@@ -790,9 +793,9 @@ export default function HomePage() {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top, rgba(63,63,70,0.45) 0%, #0a0a0b 28%, #09090b 100%)',
-        color: '#fafafa',
-        padding: '24px',
+          'radial-gradient(circle at top left, rgba(34,211,238,0.20) 0%, rgba(59,130,246,0.13) 26%, transparent 48%), radial-gradient(circle at bottom right, rgba(16,185,129,0.14) 0%, transparent 36%), linear-gradient(180deg, #111827 0%, #0f172a 48%, #111827 100%)',
+        color: '#f8fafc',
+        padding: '24px 24px 112px',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -877,10 +880,10 @@ export default function HomePage() {
                   padding: '16px',
                   borderRadius: '18px',
                   border: '1px solid #27272a',
-                  background: '#09090b',
+                  background: 'rgba(15,23,42,0.62)',
                 }}
               >
-                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                   取得地域
                 </p>
                 <p style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>
@@ -906,7 +909,7 @@ export default function HomePage() {
                     }`,
                     background: weatherDashboard.today
                       ? getRecommendationStyle(weatherDashboard.today.recommendation.level).background
-                      : '#09090b',
+                      : 'rgba(15,23,42,0.62)',
                   }}
                 >
                   <p style={{ margin: '0 0 8px 0', color: '#a1a1aa', fontSize: '12px' }}>
@@ -945,10 +948,10 @@ export default function HomePage() {
                     padding: '16px',
                     borderRadius: '18px',
                     border: '1px solid #27272a',
-                    background: '#09090b',
+                    background: 'rgba(15,23,42,0.62)',
                   }}
                 >
-                  <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                  <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                     次の洗車向き日
                   </p>
 
@@ -987,8 +990,9 @@ export default function HomePage() {
                     padding: '12px 16px',
                     borderRadius: '14px',
                     textDecoration: 'none',
-                    background: '#fafafa',
-                    color: '#09090b',
+                    background: 'linear-gradient(135deg, #22d3ee 0%, #2563eb 58%, #7c3aed 100%)',
+                    color: '#ffffff',
+                    boxShadow: '0 14px 30px rgba(37,99,235,0.28)',
                     fontWeight: 700,
                     fontSize: '14px',
                   }}
@@ -1041,8 +1045,9 @@ export default function HomePage() {
                 padding: '12px 16px',
                 borderRadius: '14px',
                 textDecoration: 'none',
-                background: '#fafafa',
-                color: '#09090b',
+                background: 'linear-gradient(135deg, #22d3ee 0%, #2563eb 58%, #7c3aed 100%)',
+                color: '#ffffff',
+                boxShadow: '0 14px 30px rgba(37,99,235,0.28)',
                 fontWeight: 700,
                 fontSize: '14px',
               }}
@@ -1067,7 +1072,7 @@ export default function HomePage() {
         >
           <section style={cardStyle()}>
             <p style={{ margin: '0 0 8px 0', fontSize: '24px' }}>⛽</p>
-            <p style={{ color: '#71717a', margin: '0 0 6px 0', fontSize: '12px' }}>
+            <p style={{ color: '#94a3b8', margin: '0 0 6px 0', fontSize: '12px' }}>
               今月の給油
             </p>
             <p style={{ margin: 0, fontSize: '28px', fontWeight: 800 }}>
@@ -1078,7 +1083,7 @@ export default function HomePage() {
 
           <section style={cardStyle()}>
             <p style={{ margin: '0 0 8px 0', fontSize: '24px' }}>🧼</p>
-            <p style={{ color: '#71717a', margin: '0 0 6px 0', fontSize: '12px' }}>
+            <p style={{ color: '#94a3b8', margin: '0 0 6px 0', fontSize: '12px' }}>
               今月の洗車
             </p>
             <p style={{ margin: 0, fontSize: '28px', fontWeight: 800 }}>
@@ -1089,7 +1094,7 @@ export default function HomePage() {
 
           <section style={cardStyle()}>
             <p style={{ margin: '0 0 8px 0', fontSize: '24px' }}>🔧</p>
-            <p style={{ color: '#71717a', margin: '0 0 6px 0', fontSize: '12px' }}>
+            <p style={{ color: '#94a3b8', margin: '0 0 6px 0', fontSize: '12px' }}>
               今月のメンテ費用
             </p>
             <p style={{ margin: 0, fontSize: '28px', fontWeight: 800 }}>
@@ -1100,7 +1105,7 @@ export default function HomePage() {
 
           <section style={cardStyle()}>
             <p style={{ margin: '0 0 8px 0', fontSize: '24px' }}>📈</p>
-            <p style={{ color: '#71717a', margin: '0 0 6px 0', fontSize: '12px' }}>
+            <p style={{ color: '#94a3b8', margin: '0 0 6px 0', fontSize: '12px' }}>
               平均燃費
             </p>
             <p style={{ margin: 0, fontSize: '28px', fontWeight: 800 }}>
@@ -1142,7 +1147,7 @@ export default function HomePage() {
                   width: '42px',
                   height: '42px',
                   borderRadius: '14px',
-                  background: '#18181b',
+                  background: 'rgba(30,41,59,0.72)',
                   border: '1px solid #27272a',
                   display: 'flex',
                   alignItems: 'center',
@@ -1193,7 +1198,7 @@ export default function HomePage() {
                   width: '42px',
                   height: '42px',
                   borderRadius: '14px',
-                  background: '#18181b',
+                  background: 'rgba(30,41,59,0.72)',
                   border: '1px solid #27272a',
                   display: 'flex',
                   alignItems: 'center',
@@ -1238,7 +1243,7 @@ export default function HomePage() {
                   width: '42px',
                   height: '42px',
                   borderRadius: '14px',
-                  background: '#18181b',
+                  background: 'rgba(30,41,59,0.72)',
                   border: '1px solid #27272a',
                   display: 'flex',
                   alignItems: 'center',
@@ -1297,7 +1302,7 @@ export default function HomePage() {
                     padding: '14px',
                     borderRadius: '16px',
                     border: '1px solid #27272a',
-                    background: '#09090b',
+                    background: 'rgba(15,23,42,0.62)',
                   }}
                 >
                   <div
@@ -1305,7 +1310,7 @@ export default function HomePage() {
                       width: '42px',
                       height: '42px',
                       borderRadius: '14px',
-                      background: '#18181b',
+                      background: 'rgba(30,41,59,0.72)',
                       border: '1px solid #27272a',
                       display: 'flex',
                       alignItems: 'center',
@@ -1322,7 +1327,7 @@ export default function HomePage() {
                     <p style={{ margin: '0 0 4px 0', color: '#a1a1aa', fontSize: '14px' }}>
                       {activity.subtitle}
                     </p>
-                    <p style={{ margin: 0, color: '#71717a', fontSize: '13px' }}>
+                    <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>
                       {activity.date}
                     </p>
                   </div>
@@ -1349,7 +1354,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1359,7 +1364,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1383,7 +1388,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1393,7 +1398,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1417,7 +1422,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1427,7 +1432,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1451,7 +1456,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1461,7 +1466,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1485,7 +1490,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1495,7 +1500,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1519,7 +1524,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1529,7 +1534,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1553,7 +1558,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1563,7 +1568,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1587,7 +1592,7 @@ export default function HomePage() {
             style={{
               ...cardStyle(),
               textDecoration: 'none',
-              color: '#fafafa',
+              color: '#f8fafc',
               display: 'block',
               padding: '18px',
             }}
@@ -1597,7 +1602,7 @@ export default function HomePage() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                background: '#18181b',
+                background: 'rgba(30,41,59,0.72)',
                 border: '1px solid #27272a',
                 display: 'flex',
                 alignItems: 'center',
@@ -1617,6 +1622,7 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+      <AppBottomNav active="home" />
     </main>
   );
 }

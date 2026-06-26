@@ -7,19 +7,21 @@ type AppHeaderCardProps = {
 
 function cardStyle() {
   return {
-    border: '1px solid rgba(113,113,122,0.24)',
-    borderRadius: '18px',
+    border: '1px solid rgba(226,232,240,0.18)',
+    borderRadius: '24px',
     padding: '24px',
     background:
-      'linear-gradient(145deg, rgba(39,39,42,0.86) 0%, rgba(12,12,14,0.98) 64%, rgba(24,24,27,0.94) 100%)',
+      'radial-gradient(circle at 12% 0%, rgba(34,211,238,0.22) 0%, transparent 34%), radial-gradient(circle at 92% 16%, rgba(167,139,250,0.16) 0%, transparent 32%), linear-gradient(145deg, rgba(30,41,59,0.9) 0%, rgba(15,23,42,0.94) 62%, rgba(17,24,39,0.9) 100%)',
     boxShadow:
-      '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)',
+      '0 24px 60px rgba(15,23,42,0.42), inset 0 1px 0 rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
   } as const;
 }
 
 function sectionLabelStyle() {
   return {
-    color: '#71717a',
+    color: '#94a3b8',
     fontSize: '12px',
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
@@ -32,7 +34,7 @@ function accentLineStyle() {
     width: '46px',
     height: '2px',
     borderRadius: '999px',
-    background: 'linear-gradient(90deg, #f8fafc 0%, #38bdf8 55%, #71717a 100%)',
+    background: 'linear-gradient(90deg, #22d3ee 0%, #60a5fa 48%, #a78bfa 100%)',
     marginTop: '10px',
   } as const;
 }
@@ -57,11 +59,12 @@ export default function AppHeaderCard({
           style={{
             width: '50px',
             height: '50px',
-            borderRadius: '15px',
+            borderRadius: '16px',
             background:
-              'linear-gradient(145deg, rgba(24,24,27,0.92), rgba(9,9,11,0.98))',
-            border: '1px solid rgba(113,113,122,0.28)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+              'linear-gradient(145deg, rgba(51,65,85,0.92), rgba(15,23,42,0.98))',
+            border: '1px solid rgba(226,232,240,0.2)',
+            boxShadow:
+              '0 10px 24px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.06)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -81,7 +84,7 @@ export default function AppHeaderCard({
         {title}
       </h1>
 
-      <p style={{ color: '#c4c4cc', margin: 0, lineHeight: 1.65 }}>{description}</p>
+      <p style={{ color: '#cbd5e1', margin: 0, lineHeight: 1.65 }}>{description}</p>
     </section>
   );
 }

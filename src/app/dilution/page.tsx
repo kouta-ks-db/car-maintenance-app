@@ -2,28 +2,36 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import AppBottomNav from '@/components/AppBottomNav';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import SectionCard from '@/components/SectionCard';
 
 function labelStyle() {
   return {
     display: 'block',
-    marginBottom: '8px',
-    color: '#a1a1aa',
-    fontSize: '14px',
+    marginBottom: '9px',
+    color: '#e2e8f0',
+    fontSize: '13px',
+    fontWeight: 700,
   } as const;
 }
 
 function inputStyle(hasError = false) {
   return {
     width: '100%',
-    padding: '14px',
-    borderRadius: '14px',
-    border: hasError ? '1px solid #ef4444' : '1px solid #3f3f46',
-    background: '#09090b',
-    color: '#fafafa',
+    padding: '15px 16px',
+    borderRadius: '16px',
+    border: hasError ? '1px solid #ef4444' : '1px solid rgba(226,232,240,0.18)',
+    background:
+      'linear-gradient(180deg, rgba(248,250,252,0.1) 0%, rgba(15,23,42,0.62) 100%)',
+    color: '#f8fafc',
     outline: 'none',
     fontSize: '15px',
+    boxShadow: hasError
+      ? '0 0 0 3px rgba(239,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.045)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    transition: 'border-color 140ms ease, box-shadow 140ms ease, background 140ms ease',
+    colorScheme: 'dark',
   } as const;
 }
 
@@ -66,9 +74,9 @@ export default function DilutionPage() {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top, rgba(63,63,70,0.45) 0%, #0a0a0b 28%, #09090b 100%)',
-        color: '#fafafa',
-        padding: '24px',
+          'radial-gradient(circle at top left, rgba(34,211,238,0.20) 0%, rgba(59,130,246,0.13) 26%, transparent 48%), radial-gradient(circle at bottom right, rgba(16,185,129,0.14) 0%, transparent 36%), linear-gradient(180deg, #111827 0%, #0f172a 48%, #111827 100%)',
+        color: '#f8fafc',
+        padding: '24px 24px 112px',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -123,7 +131,7 @@ export default function DilutionPage() {
               <p
                 style={{
                   margin: '8px 0 0 0',
-                  color: '#71717a',
+                  color: '#94a3b8',
                   fontSize: '13px',
                 }}
               >
@@ -151,9 +159,9 @@ export default function DilutionPage() {
                     style={{
                       padding: '10px 14px',
                       borderRadius: '12px',
-                      border: active ? '1px solid #60a5fa' : '1px solid #3f3f46',
-                      background: active ? '#172554' : '#09090b',
-                      color: active ? '#eff6ff' : '#fafafa',
+                      border: active ? '1px solid #60a5fa' : '1px solid rgba(226,232,240,0.18)',
+                      background: active ? 'rgba(14,165,233,0.18)' : 'rgba(15,23,42,0.62)',
+                      color: active ? '#f0f9ff' : '#f8fafc',
                       cursor: 'pointer',
                       fontWeight: 700,
                       fontSize: '14px',
@@ -171,7 +179,7 @@ export default function DilutionPage() {
           <p
             style={{
               margin: '0 0 8px 0',
-              color: '#71717a',
+              color: '#94a3b8',
               fontSize: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
@@ -197,10 +205,10 @@ export default function DilutionPage() {
                   padding: '16px',
                   borderRadius: '16px',
                   border: '1px solid #27272a',
-                  background: '#09090b',
+                  background: 'rgba(15,23,42,0.62)',
                 }}
               >
-                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                   原液
                 </p>
                 <p style={{ margin: 0, fontSize: '30px', fontWeight: 800 }}>
@@ -222,10 +230,10 @@ export default function DilutionPage() {
                   padding: '16px',
                   borderRadius: '16px',
                   border: '1px solid #27272a',
-                  background: '#09090b',
+                  background: 'rgba(15,23,42,0.62)',
                 }}
               >
-                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                   水
                 </p>
                 <p style={{ margin: 0, fontSize: '30px', fontWeight: 800 }}>
@@ -249,7 +257,7 @@ export default function DilutionPage() {
           <p
             style={{
               margin: '0 0 10px 0',
-              color: '#71717a',
+              color: '#94a3b8',
               fontSize: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
@@ -262,7 +270,7 @@ export default function DilutionPage() {
             style={{
               borderRadius: '16px',
               border: '1px solid #27272a',
-              background: '#09090b',
+              background: 'rgba(15,23,42,0.62)',
               padding: '16px',
             }}
           >
@@ -278,6 +286,7 @@ export default function DilutionPage() {
           </div>
         </SectionCard>
       </div>
+      <AppBottomNav active="calculator" />
     </main>
   );
 }

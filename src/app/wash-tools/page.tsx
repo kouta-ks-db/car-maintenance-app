@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AppBottomNav from '@/components/AppBottomNav';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
 import SectionCard from '@/components/SectionCard';
@@ -92,22 +93,29 @@ async function getFirebaseModules() {
 function labelStyle() {
   return {
     display: 'block',
-    marginBottom: '8px',
-    color: '#a1a1aa',
-    fontSize: '14px',
+    marginBottom: '9px',
+    color: '#e2e8f0',
+    fontSize: '13px',
+    fontWeight: 700,
   } as const;
 }
 
 function inputStyle(hasError = false) {
   return {
     width: '100%',
-    padding: '14px',
-    borderRadius: '14px',
-    border: hasError ? '1px solid #ef4444' : '1px solid #3f3f46',
-    background: '#09090b',
-    color: '#fafafa',
+    padding: '15px 16px',
+    borderRadius: '16px',
+    border: hasError ? '1px solid #ef4444' : '1px solid rgba(226,232,240,0.18)',
+    background:
+      'linear-gradient(180deg, rgba(248,250,252,0.1) 0%, rgba(15,23,42,0.62) 100%)',
+    color: '#f8fafc',
     outline: 'none',
     fontSize: '15px',
+    boxShadow: hasError
+      ? '0 0 0 3px rgba(239,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.045)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    transition: 'border-color 140ms ease, box-shadow 140ms ease, background 140ms ease',
+    colorScheme: 'dark',
   } as const;
 }
 
@@ -652,9 +660,9 @@ export default function WashToolsPage() {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top, rgba(63,63,70,0.45) 0%, #0a0a0b 28%, #09090b 100%)',
-        color: '#fafafa',
-        padding: '24px',
+          'radial-gradient(circle at top left, rgba(34,211,238,0.20) 0%, rgba(59,130,246,0.13) 26%, transparent 48%), radial-gradient(circle at bottom right, rgba(16,185,129,0.14) 0%, transparent 36%), linear-gradient(180deg, #111827 0%, #0f172a 48%, #111827 100%)',
+        color: '#f8fafc',
+        padding: '24px 24px 112px',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -696,7 +704,7 @@ export default function WashToolsPage() {
               background: 'rgba(9,9,11,0.78)',
             }}
           >
-            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+            <p style={{ margin: '0 0 6px 0', color: '#94a3b8', fontSize: '12px' }}>
               道具
             </p>
             <p style={{ margin: 0, fontSize: '24px', fontWeight: 800 }}>
@@ -715,7 +723,7 @@ export default function WashToolsPage() {
               background: 'rgba(9,9,11,0.78)',
             }}
           >
-            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+            <p style={{ margin: '0 0 6px 0', color: '#94a3b8', fontSize: '12px' }}>
               カテゴリ
             </p>
             <p style={{ margin: 0, fontSize: '24px', fontWeight: 800 }}>
@@ -734,7 +742,7 @@ export default function WashToolsPage() {
               background: 'rgba(9,9,11,0.78)',
             }}
           >
-            <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+            <p style={{ margin: '0 0 6px 0', color: '#94a3b8', fontSize: '12px' }}>
               登録金額
             </p>
             <p style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>
@@ -759,7 +767,7 @@ export default function WashToolsPage() {
               <p
                 style={{
                   margin: '0 0 6px 0',
-                  color: '#71717a',
+                  color: '#94a3b8',
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
@@ -776,9 +784,9 @@ export default function WashToolsPage() {
               style={{
                 padding: '10px 13px',
                 borderRadius: '12px',
-                border: '1px solid #3f3f46',
-                background: '#18181b',
-                color: '#fafafa',
+                border: '1px solid rgba(226,232,240,0.18)',
+                background: 'rgba(30,41,59,0.72)',
+                color: '#f8fafc',
                 textDecoration: 'none',
                 fontSize: '14px',
                 fontWeight: 700,
@@ -882,8 +890,8 @@ export default function WashToolsPage() {
               style={{
                 padding: '14px',
                 borderRadius: '14px',
-                border: '1px solid #3f3f46',
-                background: '#09090b',
+                border: '1px solid rgba(226,232,240,0.18)',
+                background: 'rgba(15,23,42,0.62)',
               }}
             >
               <input
@@ -892,7 +900,7 @@ export default function WashToolsPage() {
                 onChange={handleImageChange}
                 style={{
                   width: '100%',
-                  color: '#fafafa',
+                  color: '#f8fafc',
                 }}
               />
 
@@ -920,9 +928,9 @@ export default function WashToolsPage() {
                       marginTop: '10px',
                       padding: '9px 13px',
                       borderRadius: '12px',
-                      border: '1px solid #3f3f46',
+                      border: '1px solid rgba(226,232,240,0.18)',
                       background: 'transparent',
-                      color: '#fafafa',
+                      color: '#f8fafc',
                       cursor: 'pointer',
                       fontSize: '14px',
                       fontWeight: 700,
@@ -935,7 +943,7 @@ export default function WashToolsPage() {
                 <p
                   style={{
                     margin: '12px 0 0 0',
-                    color: '#71717a',
+                    color: '#94a3b8',
                     fontSize: '14px',
                   }}
                 >
@@ -964,8 +972,9 @@ export default function WashToolsPage() {
                 padding: '14px',
                 borderRadius: '14px',
                 border: 'none',
-                background: '#fafafa',
-                color: '#09090b',
+                background: 'linear-gradient(135deg, #22d3ee 0%, #2563eb 58%, #7c3aed 100%)',
+                color: '#ffffff',
+                boxShadow: '0 14px 30px rgba(37,99,235,0.28)',
                 fontWeight: 700,
                 cursor: 'pointer',
                 fontSize: '15px',
@@ -981,9 +990,9 @@ export default function WashToolsPage() {
                   flex: 1,
                   padding: '14px',
                   borderRadius: '14px',
-                  border: '1px solid #3f3f46',
+                  border: '1px solid rgba(226,232,240,0.18)',
                   background: 'transparent',
-                  color: '#fafafa',
+                  color: '#f8fafc',
                   fontWeight: 700,
                   cursor: 'pointer',
                   fontSize: '15px',
@@ -999,7 +1008,7 @@ export default function WashToolsPage() {
           <p
             style={{
               margin: '0 0 8px 0',
-              color: '#71717a',
+              color: '#94a3b8',
               fontSize: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
@@ -1023,7 +1032,7 @@ export default function WashToolsPage() {
             }}
           >
             <h2 style={{ fontSize: '20px', margin: 0 }}>洗車道具一覧</h2>
-            <span style={{ color: '#71717a', fontSize: '13px' }}>
+            <span style={{ color: '#94a3b8', fontSize: '13px' }}>
               {isLoaded ? `${tools.length} 件` : '読み込み中...'}
             </span>
           </div>
@@ -1040,7 +1049,7 @@ export default function WashToolsPage() {
                   style={{
                     borderRadius: '16px',
                     border: '1px solid #27272a',
-                    background: '#09090b',
+                    background: 'rgba(15,23,42,0.62)',
                     padding: '16px',
                   }}
                 >
@@ -1103,7 +1112,7 @@ export default function WashToolsPage() {
                         padding: '9px 13px',
                         borderRadius: '12px',
                         border: '1px solid #1d4ed8',
-                        background: '#172554',
+                        background: 'rgba(14,165,233,0.18)',
                         color: '#bfdbfe',
                         cursor: 'pointer',
                         fontSize: '14px',
@@ -1135,6 +1144,7 @@ export default function WashToolsPage() {
           )}
         </SectionCard>
       </div>
+      <AppBottomNav active="tools" />
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AppBottomNav from '@/components/AppBottomNav';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import SectionCard from '@/components/SectionCard';
 
@@ -128,15 +129,15 @@ function getRecommendationStyle(level: RecommendationLevel) {
     return {
       text: '#bfdbfe',
       border: '#1d4ed8',
-      background: '#172554',
+      background: 'rgba(14,165,233,0.18)',
     };
   }
 
   if (level === 'good') {
     return {
       text: '#f4f4f5',
-      border: '#3f3f46',
-      background: '#18181b',
+      border: 'rgba(226,232,240,0.18)',
+      background: 'rgba(30,41,59,0.72)',
     };
   }
 
@@ -157,7 +158,7 @@ function getRecommendationStyle(level: RecommendationLevel) {
 
 function sectionLabelStyle() {
   return {
-    color: '#71717a',
+    color: '#94a3b8',
     fontSize: '12px',
     letterSpacing: '0.12em',
     textTransform: 'uppercase' as const,
@@ -170,32 +171,36 @@ function accentLineStyle() {
     width: '42px',
     height: '3px',
     borderRadius: '999px',
-    background: 'linear-gradient(90deg, #fafafa 0%, #71717a 100%)',
+    background: 'linear-gradient(90deg, #22d3ee 0%, #60a5fa 48%, #a78bfa 100%)',
     marginTop: '10px',
   } as const;
 }
 
 function cardStyle() {
   return {
-    border: '1px solid #27272a',
+    border: '1px solid rgba(226,232,240,0.16)',
     borderRadius: '22px',
     padding: '18px',
     background:
-      'linear-gradient(180deg, rgba(39,39,42,0.94) 0%, rgba(24,24,27,0.98) 100%)',
-    boxShadow: '0 14px 34px rgba(0,0,0,0.28)',
+      'linear-gradient(180deg, rgba(30,41,59,0.86) 0%, rgba(15,23,42,0.9) 100%)',
+    boxShadow: '0 18px 44px rgba(15,23,42,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
   } as const;
 }
 
 function inputStyle() {
   return {
     width: '100%',
-    padding: '14px',
-    borderRadius: '14px',
-    border: '1px solid #3f3f46',
-    background: '#09090b',
-    color: '#fafafa',
+    padding: '15px 16px',
+    borderRadius: '16px',
+    border: '1px solid rgba(226,232,240,0.18)',
+    background:
+      'linear-gradient(180deg, rgba(248,250,252,0.1) 0%, rgba(15,23,42,0.62) 100%)',
+    color: '#f8fafc',
     outline: 'none',
     fontSize: '15px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    transition: 'border-color 140ms ease, box-shadow 140ms ease, background 140ms ease',
+    colorScheme: 'dark',
   } as const;
 }
 
@@ -447,9 +452,9 @@ export default function WeatherPage() {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top, rgba(63,63,70,0.45) 0%, #0a0a0b 28%, #09090b 100%)',
-        color: '#fafafa',
-        padding: '24px',
+          'radial-gradient(circle at top left, rgba(34,211,238,0.20) 0%, rgba(59,130,246,0.13) 26%, transparent 48%), radial-gradient(circle at bottom right, rgba(16,185,129,0.14) 0%, transparent 36%), linear-gradient(180deg, #111827 0%, #0f172a 48%, #111827 100%)',
+        color: '#f8fafc',
+        padding: '24px 24px 112px',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
@@ -488,9 +493,9 @@ export default function WeatherPage() {
                 border:
                   locationMode === 'current'
                     ? '1px solid #60a5fa'
-                    : '1px solid #3f3f46',
-                background: locationMode === 'current' ? '#172554' : '#09090b',
-                color: locationMode === 'current' ? '#eff6ff' : '#fafafa',
+                    : '1px solid rgba(226,232,240,0.18)',
+                background: locationMode === 'current' ? 'rgba(14,165,233,0.18)' : 'rgba(15,23,42,0.62)',
+                color: locationMode === 'current' ? '#f0f9ff' : '#f8fafc',
                 cursor: 'pointer',
                 fontWeight: 700,
                 fontSize: '14px',
@@ -520,9 +525,9 @@ export default function WeatherPage() {
                     style={{
                       padding: '10px 14px',
                       borderRadius: '12px',
-                      border: active ? '1px solid #60a5fa' : '1px solid #3f3f46',
-                      background: active ? '#172554' : '#09090b',
-                      color: active ? '#eff6ff' : '#fafafa',
+                      border: active ? '1px solid #60a5fa' : '1px solid rgba(226,232,240,0.18)',
+                      background: active ? 'rgba(14,165,233,0.18)' : 'rgba(15,23,42,0.62)',
+                      color: active ? '#f0f9ff' : '#f8fafc',
                       cursor: 'pointer',
                       fontWeight: 700,
                       fontSize: '14px',
@@ -578,8 +583,9 @@ export default function WeatherPage() {
                   padding: '12px 16px',
                   borderRadius: '14px',
                   border: 'none',
-                  background: '#fafafa',
-                  color: '#09090b',
+                  background: 'linear-gradient(135deg, #22d3ee 0%, #2563eb 58%, #7c3aed 100%)',
+                  color: '#ffffff',
+                  boxShadow: '0 14px 30px rgba(37,99,235,0.28)',
                   fontWeight: 700,
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -647,7 +653,7 @@ export default function WeatherPage() {
               }}
             >
               <div style={cardStyle()}>
-                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                   今日のおすすめ度
                 </p>
 
@@ -673,7 +679,7 @@ export default function WeatherPage() {
               </div>
 
               <div style={cardStyle()}>
-                <p style={{ margin: '0 0 8px 0', color: '#71717a', fontSize: '12px' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#94a3b8', fontSize: '12px' }}>
                   今日の条件
                 </p>
                 <p style={{ margin: '0 0 6px 0' }}>
@@ -739,7 +745,7 @@ export default function WeatherPage() {
                       </div>
 
                       <div>
-                        <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+                        <p style={{ margin: '0 0 6px 0', color: '#94a3b8', fontSize: '12px' }}>
                           気温 / 降水
                         </p>
                         <p style={{ margin: '0 0 4px 0' }}>
@@ -751,7 +757,7 @@ export default function WeatherPage() {
                       </div>
 
                       <div>
-                        <p style={{ margin: '0 0 6px 0', color: '#71717a', fontSize: '12px' }}>
+                        <p style={{ margin: '0 0 6px 0', color: '#94a3b8', fontSize: '12px' }}>
                           風 / 黄砂 / 洗車
                         </p>
                         <p style={{ margin: '0 0 4px 0' }}>
@@ -783,6 +789,7 @@ export default function WeatherPage() {
           )}
         </SectionCard>
       </div>
+      <AppBottomNav active="weather" />
     </main>
   );
 }
