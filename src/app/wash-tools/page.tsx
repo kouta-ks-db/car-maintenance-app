@@ -920,10 +920,12 @@ export default function WashToolsPage() {
                     alt="洗車道具のプレビュー"
                     style={{
                       width: '100%',
+                      height: '220px',
                       marginTop: '14px',
                       borderRadius: '14px',
                       border: '1px solid #27272a',
                       objectFit: 'cover',
+                      objectPosition: 'center',
                     }}
                   />
                   <button
@@ -1105,10 +1107,12 @@ export default function WashToolsPage() {
                       alt="洗車道具の写真"
                       style={{
                         width: '100%',
+                        height: '180px',
                         borderRadius: '14px',
                         border: '1px solid #27272a',
                         marginBottom: '12px',
                         objectFit: 'cover',
+                        objectPosition: 'center',
                       }}
                     />
                   ) : null}
