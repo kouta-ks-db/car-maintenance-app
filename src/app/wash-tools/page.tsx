@@ -924,7 +924,8 @@ export default function WashToolsPage() {
                       marginTop: '14px',
                       borderRadius: '14px',
                       border: '1px solid #27272a',
-                      objectFit: 'cover',
+                      background: 'rgba(15,23,42,0.72)',
+                      objectFit: 'contain',
                       objectPosition: 'center',
                     }}
                   />
@@ -1111,7 +1112,8 @@ export default function WashToolsPage() {
                         borderRadius: '14px',
                         border: '1px solid #27272a',
                         marginBottom: '12px',
-                        objectFit: 'cover',
+                        background: 'rgba(15,23,42,0.72)',
+                        objectFit: 'contain',
                         objectPosition: 'center',
                       }}
                     />
