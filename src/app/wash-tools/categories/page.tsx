@@ -9,7 +9,7 @@ import SectionCard from '@/components/SectionCard';
 type WashToolCategory =
   | 'シャンプー'
   | 'コーティング剤'
-  | 'クリーナー'
+  | 'コンパウンド'
   | 'タオル・クロス'
   | 'スポンジ・ミット'
   | 'ブラシ'
@@ -33,7 +33,7 @@ type WashTool = {
 type FirestoreWashTool = {
   id?: number;
   name?: string;
-  category?: WashToolCategory;
+  category?: string;
   brand?: string;
   imageBucket?: string;
   imagePath?: string;
@@ -48,7 +48,7 @@ const IMAGE_STORE_NAME = 'wash-tool-images';
 const CATEGORY_OPTIONS: WashToolCategory[] = [
   'シャンプー',
   'コーティング剤',
-  'クリーナー',
+  'コンパウンド',
   'タオル・クロス',
   'スポンジ・ミット',
   'ブラシ',
@@ -57,6 +57,14 @@ const CATEGORY_OPTIONS: WashToolCategory[] = [
   '高圧洗浄機',
   'その他',
 ];
+
+function normalizeCategory(category?: string): WashToolCategory {
+  if (category === 'クリーナー') return 'コンパウンド';
+  if (CATEGORY_OPTIONS.includes(category as WashToolCategory)) {
+    return category as WashToolCategory;
+  }
+  return 'その他';
+}
 
 async function getFirebaseModules() {
   const [{ db }, firestore] = await Promise.all([
@@ -172,7 +180,7 @@ function normalizeFirestoreRecord(
     id: typeof record.id === 'number' ? record.id : fallbackId,
     docId,
     name: record.name ?? '',
-    category: record.category ?? 'その他',
+    category: normalizeCategory(record.category),
     brand: record.brand ?? '',
     imageBucket: record.imageBucket ?? '',
     imagePath: record.imagePath ?? '',
@@ -229,7 +237,7 @@ export default function WashToolCategoriesPage() {
           .filter((tool) => tool.name)
           .map((tool) => ({
             ...tool,
-            category: tool.category ?? 'その他',
+            category: normalizeCategory(tool.category),
           }))
           .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
         const toolsWithImages = await hydrateLocalImages(normalized);
