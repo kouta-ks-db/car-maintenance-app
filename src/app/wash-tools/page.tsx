@@ -886,19 +886,31 @@ export default function WashToolsPage() {
 
           <div style={{ marginBottom: '16px' }}>
             <label style={labelStyle()}>メーカー・ブランド</label>
+            {brandOptions.length > 0 ? (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setBrand(e.target.value);
+                  }
+                }}
+                style={{ ...inputStyle(false), marginBottom: '10px' }}
+              >
+                <option value="">過去のメーカー・ブランドから選択</option>
+                {brandOptions.map((brandOption) => (
+                  <option key={brandOption} value={brandOption}>
+                    {brandOption}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <input
               type="text"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
-              list="wash-tool-brand-options"
               placeholder="例: SONAX、SurLuster、Koch Chemie"
               style={inputStyle(false)}
             />
-            <datalist id="wash-tool-brand-options">
-              {brandOptions.map((brandOption) => (
-                <option key={brandOption} value={brandOption} />
-              ))}
-            </datalist>
             {brandOptions.length > 0 ? (
               <p
                 style={{
@@ -908,7 +920,7 @@ export default function WashToolsPage() {
                   lineHeight: 1.45,
                 }}
               >
-                過去に登録したメーカー名を候補から選べます。新しい名前も入力できます。
+                候補を選ぶと下の入力欄に反映されます。新しい名前も自由に入力できます。
               </p>
             ) : null}
           </div>
