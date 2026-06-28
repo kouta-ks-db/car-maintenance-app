@@ -812,28 +812,55 @@ export default function WashToolsPage() {
                   letterSpacing: '0.08em',
                 }}
               >
-                Category View
+                List Views
               </p>
               <p style={{ margin: 0, color: '#e4e4e7', fontSize: '14px' }}>
-                写真と道具名をカテゴリごとに確認
+                写真と道具名をカテゴリ・メーカーごとに確認
               </p>
             </div>
-            <Link
-              href="/wash-tools/categories"
+            <div
               style={{
-                padding: '10px 13px',
-                borderRadius: '12px',
-                border: '1px solid rgba(226,232,240,0.18)',
-                background: 'rgba(30,41,59,0.72)',
-                color: '#f8fafc',
-                textDecoration: 'none',
-                fontSize: '14px',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: '8px',
+                minWidth: '118px',
               }}
             >
-              一覧を見る
-            </Link>
+              <Link
+                href="/wash-tools/categories"
+                style={{
+                  padding: '10px 13px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(226,232,240,0.18)',
+                  background: 'rgba(30,41,59,0.72)',
+                  color: '#f8fafc',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                カテゴリ別
+              </Link>
+              <Link
+                href="/wash-tools/brands"
+                style={{
+                  padding: '10px 13px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(34,211,238,0.34)',
+                  background: 'rgba(14,165,233,0.16)',
+                  color: '#cffafe',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                メーカー別
+              </Link>
+            </div>
           </div>
         </SectionCard>
 
