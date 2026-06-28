@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AppBottomNav from '@/components/AppBottomNav';
 import AppHeaderCard from '@/components/AppHeaderCard';
 import DateInputWithPicker from '@/components/DateInputWithPicker';
@@ -340,6 +340,7 @@ export default function WashToolsPage() {
   const [errors, setErrors] = useState<WashToolErrors>({});
   const [tools, setTools] = useState<WashTool[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const didApplyEditParam = useRef(false);
 
   const toolStats = useMemo(() => {
     const categories = new Set(
@@ -354,6 +355,16 @@ export default function WashToolsPage() {
       categoryCount: categories.size,
       totalPrice,
     };
+  }, [tools]);
+
+  const brandOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        tools
+          .map((tool) => tool.brand.trim())
+          .filter((toolBrand) => toolBrand.length > 0)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [tools]);
 
   useEffect(() => {
@@ -434,6 +445,26 @@ export default function WashToolsPage() {
     const textOnlyTools = tools.map(removeImage);
     window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(textOnlyTools));
   }, [tools, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || didApplyEditParam.current) return;
+
+    const editTarget = new URLSearchParams(window.location.search).get('edit');
+    if (!editTarget) return;
+
+    const targetTool = tools.find(
+      (tool) => tool.docId === editTarget || String(tool.id) === editTarget
+    );
+
+    if (!targetTool) {
+      setSavedMessage('編集対象の洗車道具が見つかりませんでした');
+      didApplyEditParam.current = true;
+      return;
+    }
+
+    didApplyEditParam.current = true;
+    handleEdit(targetTool);
+  }, [isLoaded, tools]);
 
   function resetForm() {
     setName('');
@@ -520,7 +551,7 @@ export default function WashToolsPage() {
         await updateDoc(doc(db, 'washTools', targetTool.docId), {
           name: name.trim(),
           category,
-          brand,
+          brand: brand.trim(),
           purchaseDate,
           price,
           memo,
@@ -537,7 +568,7 @@ export default function WashToolsPage() {
                   ...tool,
                   name: name.trim(),
                   category,
-                  brand,
+                  brand: brand.trim(),
                   purchaseDate,
                   price,
                   memo,
@@ -556,7 +587,7 @@ export default function WashToolsPage() {
           id: Date.now(),
           name: name.trim(),
           category,
-          brand,
+          brand: brand.trim(),
           purchaseDate,
           price,
           memo,
@@ -859,9 +890,27 @@ export default function WashToolsPage() {
               type="text"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
+              list="wash-tool-brand-options"
               placeholder="例: SONAX、SurLuster、Koch Chemie"
               style={inputStyle(false)}
             />
+            <datalist id="wash-tool-brand-options">
+              {brandOptions.map((brandOption) => (
+                <option key={brandOption} value={brandOption} />
+              ))}
+            </datalist>
+            {brandOptions.length > 0 ? (
+              <p
+                style={{
+                  margin: '8px 0 0 0',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  lineHeight: 1.45,
+                }}
+              >
+                過去に登録したメーカー名を候補から選べます。新しい名前も入力できます。
+              </p>
+            ) : null}
           </div>
 
           <div style={{ marginBottom: '16px' }}>

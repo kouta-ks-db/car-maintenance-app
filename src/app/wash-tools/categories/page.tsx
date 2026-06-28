@@ -24,6 +24,9 @@ type WashTool = {
   name: string;
   category: WashToolCategory;
   brand?: string;
+  purchaseDate?: string;
+  price?: string;
+  memo?: string;
   imageBucket?: string;
   imagePath?: string;
   imageUrl?: string;
@@ -35,6 +38,9 @@ type FirestoreWashTool = {
   name?: string;
   category?: string;
   brand?: string;
+  purchaseDate?: string;
+  price?: string;
+  memo?: string;
   imageBucket?: string;
   imagePath?: string;
   imageUrl?: string;
@@ -76,6 +82,8 @@ async function getFirebaseModules() {
     db,
     collection: firestore.collection,
     getDocs: firestore.getDocs,
+    doc: firestore.doc,
+    deleteDoc: firestore.deleteDoc,
   };
 }
 
@@ -142,6 +150,48 @@ async function getLocalImage(recordKey: string): Promise<string | undefined> {
   });
 }
 
+async function deleteLocalImage(recordKey: string): Promise<void> {
+  const db = await openWashToolImageDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(IMAGE_STORE_NAME);
+    const request = store.delete(recordKey);
+
+    request.onerror = () =>
+      reject(request.error ?? new Error('画像の削除に失敗しました'));
+
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error ?? new Error('画像削除トランザクションに失敗しました'));
+    };
+  });
+}
+
+async function deleteCloudImage(
+  imagePath?: string,
+  imageBucket?: string
+): Promise<void> {
+  if (!imagePath) return;
+
+  try {
+    await fetch('/api/wash-tool-image', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ imageBucket, imagePath }),
+    });
+  } catch (error) {
+    console.error('クラウド画像の削除に失敗しました:', error);
+  }
+}
+
 async function hydrateLocalImages(tools: WashTool[]) {
   return Promise.all(
     tools.map(async (tool) => {
@@ -182,10 +232,35 @@ function normalizeFirestoreRecord(
     name: record.name ?? '',
     category: normalizeCategory(record.category),
     brand: record.brand ?? '',
+    purchaseDate: record.purchaseDate ?? '',
+    price: record.price ?? '',
+    memo: record.memo ?? '',
     imageBucket: record.imageBucket ?? '',
     imagePath: record.imagePath ?? '',
     imageUrl: record.imageUrl ?? '',
   };
+}
+
+function getEditHref(tool: WashTool) {
+  const editKey = tool.docId ?? String(tool.id);
+  return `/wash-tools?edit=${encodeURIComponent(editKey)}`;
+}
+
+function removeToolFromLocalStorage(targetTool: WashTool) {
+  const savedTextTools = window.localStorage.getItem(TEXT_STORAGE_KEY);
+  if (!savedTextTools) return;
+
+  try {
+    const parsed = JSON.parse(savedTextTools) as WashTool[];
+    const nextTools = parsed.filter((tool) => {
+      if (targetTool.docId && tool.docId === targetTool.docId) return false;
+      return tool.id !== targetTool.id;
+    });
+
+    window.localStorage.setItem(TEXT_STORAGE_KEY, JSON.stringify(nextTools));
+  } catch (error) {
+    console.error('localStorageの洗車道具削除に失敗しました:', error);
+  }
 }
 
 export default function WashToolCategoriesPage() {
@@ -262,6 +337,33 @@ export default function WashToolCategoriesPage() {
       tools: tools.filter((tool) => tool.category === category),
     }));
   }, [tools]);
+
+  async function handleDelete(tool: WashTool) {
+    const ok = window.confirm(`${tool.name} を削除しますか？`);
+    if (!ok) return;
+
+    try {
+      if (tool.docId) {
+        const { db, doc, deleteDoc } = await getFirebaseModules();
+        await deleteDoc(doc(db, 'washTools', tool.docId));
+        await deleteCloudImage(tool.imagePath, tool.imageBucket);
+        await deleteLocalImage(tool.docId);
+      } else {
+        await deleteLocalImage(getRecordKey(tool));
+      }
+
+      setTools((prev) => prev.filter((prevTool) => prevTool.id !== tool.id));
+      removeToolFromLocalStorage(tool);
+      setSavedMessage('洗車道具を削除しました');
+    } catch (error) {
+      console.error('削除に失敗しました:', error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'unknown error';
+
+      setSavedMessage(`削除失敗: ${errorMessage}`);
+    }
+  }
 
   return (
     <main
@@ -411,7 +513,8 @@ export default function WashToolCategoriesPage() {
                             style={{
                               width: '100%',
                               height: '100%',
-                              objectFit: 'cover',
+                              objectFit: 'contain',
+                              background: 'rgba(15,23,42,0.72)',
                               display: 'block',
                             }}
                           />
@@ -457,6 +560,47 @@ export default function WashToolCategoriesPage() {
                             {tool.brand}
                           </p>
                         ) : null}
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '8px',
+                            marginTop: '11px',
+                          }}
+                        >
+                          <Link
+                            href={getEditHref(tool)}
+                            style={{
+                              padding: '8px 9px',
+                              borderRadius: '11px',
+                              border: '1px solid rgba(59,130,246,0.52)',
+                              background: 'rgba(14,165,233,0.15)',
+                              color: '#bfdbfe',
+                              textAlign: 'center',
+                              textDecoration: 'none',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                            }}
+                          >
+                            編集
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(tool)}
+                            style={{
+                              padding: '8px 9px',
+                              borderRadius: '11px',
+                              border: '1px solid rgba(127,29,29,0.9)',
+                              background: 'rgba(69,10,10,0.86)',
+                              color: '#fecaca',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                            }}
+                          >
+                            削除
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
